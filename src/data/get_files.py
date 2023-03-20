@@ -5,11 +5,14 @@ import regex as re
 from tqdm import tqdm
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import defaultdict
 
 
 Fil = pd.read_pickle('data/raw/Fil.pkl')
+bad_files = defaultdict()
 
-output_folder = 'data/procesed/'
+
+output_folder = 'data/processed/'
 
 def extract_text_from_html(html_doc):
     soup = BeautifulSoup(html_doc, 'html.parser')
@@ -41,7 +44,14 @@ def download_and_save(row, output_dir):
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(text)
         else:
-            print(f"Failed to download {url} with status code {response.status_code}")
+            #print(f"Failed to download {url} with status code {response.status_code}")
+            #saving to bad_files dict along with the status code
+            bad_files[url] = response.status_code
+            count += 1
+            if count%50 == 0:
+                print(f"Failed to download {url} with status code {response.status_code}")
+                print(f"There have been {count} bad files so far")
+
         
     except Exception as e:
         print(f"Error processing {url}: {e}")
@@ -49,7 +59,7 @@ def download_and_save(row, output_dir):
 
 def download_and_save_all(df, output_dir, num_workers=16):
     os.makedirs(output_dir, exist_ok=True)
-
+    count = 0
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         futures = {executor.submit(download_and_save, row, output_dir): row for _, row in df.iterrows()}
         progress_bar = tqdm(total=len(futures), desc="Downloading and processing", unit="file")
@@ -65,5 +75,7 @@ def download_and_save_all(df, output_dir, num_workers=16):
 
         progress_bar.close()
 
-# Call the function with your DataFrame and output folder
+# Call the function with DataFrame and output folder
 download_and_save_all(Fil, output_folder)
+#save the bad_files dict to a pickle file
+pd.to_pickle(bad_files, 'data/raw/bad_files.pkl')
