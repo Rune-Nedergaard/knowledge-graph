@@ -88,3 +88,4 @@ target/
 # Mypy cache
 .mypy_cache/
 *.pickle
+src/deployment/api_secrets.py
