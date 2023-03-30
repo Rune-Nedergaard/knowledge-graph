@@ -11,6 +11,8 @@ import math
 from danlp.models import load_bert_base_model
 import re
 from tqdm import tqdm
+import concurrent.futures
+
 
 ids = [int(file.split('\\')[-1].split('.')[0]) for file in glob.glob('data/questions_rephrased/*.txt')]
 Random_subset = pd.read_pickle('data/raw/random_subset.pkl')
@@ -127,12 +129,21 @@ def split_into_paragraphs(text, max_tokens=500, model=model):
 
     return paragraphs
 
+
 if __name__ == '__main__':
-    for file in tqdm(text_files, total=len(text_files)):
+    def process_file(file):
+        output_file = f'data/paragraphs/{file}.txt'
+        if os.path.exists(output_file):
+            print(f"{output_file} already exists, skipping processing for this file.")
+            return
         with open(f'data/processed/{file}.txt', 'r', encoding='utf-8') as f:
             text = f.read()
-        paragraphs = split_into_paragraphs(text, max_tokens = 500, model=model)
+        paragraphs = split_into_paragraphs(text, model=model)
         with open(f'data/paragraphs/{file}.txt', 'w', encoding='utf-8') as f:
             for paragraph in paragraphs:
-                #write paragraph to file, separated by new line
                 f.write(paragraph + '\n')
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(process_file, file) for file in text_files]
+        for future in tqdm(concurrent.futures.as_completed(futures), total = len(futures)):
+            future.result()
