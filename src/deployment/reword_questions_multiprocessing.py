@@ -14,7 +14,7 @@ failed_files = []
 
 output_folder = 'data/questions_rephrased'
 
-questions = pd.read_pickle('data/raw/random_subset.pkl') 
+questions = pd.read_pickle('data/raw/random_subset2.pkl')# doing another 20.0000 
 ids = [question[0] for question in questions]
 question_text = [question[1] for question in questions]
 #remove space at the begnning of the string if there is one
@@ -28,7 +28,6 @@ question_text = [re.sub(r'\s+$', '', question) for question in question_text]
 
 zipped = zip(question_text, ids)
 zipped = list(zipped)
-
 
 
 def process_question(text, id):
@@ -67,7 +66,7 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
-    with open('data/failed_question_rephrased.pkl', 'wb') as f:
+    with open('data/failed_question_rephrased2.pkl', 'wb') as f:
         pickle.dump(failed_files, f)
 
 

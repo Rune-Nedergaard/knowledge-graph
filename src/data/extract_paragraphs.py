@@ -134,7 +134,7 @@ if __name__ == '__main__':
     def process_file(file):
         output_file = f'data/paragraphs/{file}.txt'
         if os.path.exists(output_file):
-            print(f"{output_file} already exists, skipping processing for this file.")
+            #print(f"{output_file} already exists, skipping processing for this file.")
             return
         with open(f'data/processed/{file}.txt', 'r', encoding='utf-8') as f:
             text = f.read()
