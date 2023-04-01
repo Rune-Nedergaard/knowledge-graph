@@ -47,6 +47,8 @@ def get_question_chunk_pairs(data_folder, question_to_fil):
     return question_chunk_pairs
 
 
+
+
 data_folder = 'data'
 
 question_chunk_pairs = get_question_chunk_pairs(data_folder, question_to_fil)
