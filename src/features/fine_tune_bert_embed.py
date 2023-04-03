@@ -198,22 +198,46 @@ train_loader = DataLoader(train_data, batch_size=8, shuffle=True)
 val_loader = DataLoader(val_data, batch_size=8, shuffle=False)
 test_loader = DataLoader(test_data, batch_size=8, shuffle=False)
 
+def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
+    checkpoint_path = os.path.join(checkpoints_dir, f'checkpoint_epoch_{epoch}.pth')
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        return checkpoint['train_losses'], checkpoint['test_losses']
+    else:
+        print(f"Checkpoint not found at: {checkpoint_path}")
+        return [], []
 
 
 
-checkpoints_dir = 'models/checkpoints'
-if not os.path.exists(checkpoints_dir):
-    os.makedirs(checkpoints_dir)
+
+start_epoch = 2  # Set the epoch number from which you want to continue training (1-indexed)
+train_losses, test_losses = load_checkpoint(model, optimizer, checkpoints_dir, start_epoch)
+
+if train_losses is None:
+    train_losses = []
+    test_losses = []
+    start_epoch = 1
+else:
+    print(f"Continuing training from epoch {start_epoch}")
+
+
+
+
 
 # Fine-tune the model
-num_epochs = 3
+num_epochs = 2
 print(f"Fine-tuning the model for {num_epochs} epochs...")
 
 best_test_loss = float('inf')  # Initialize the best validation loss as infinity
-train_losses = []  # Initialize list to store training losses for each epoch
-test_losses = []  # Initialize list to store test losses for each epoch
+# Moved these indside the load function
+#train_losses = []  # Initialize list to store training losses for each epoch
+#test_losses = []  # Initialize list to store test losses for each epoch
 
-for epoch in range(num_epochs):
+#for epoch in range(num_epochs):
+for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-indexed
+
     print(f"Epoch {epoch + 1}/{num_epochs}")
     model.train()
     train_loss = 0
@@ -271,7 +295,7 @@ for epoch in range(num_epochs):
     if test_loss < best_test_loss:
         print(f"Improved test loss from {best_test_loss:.4f} to {test_loss:.4f}. Saving the model.")
         best_test_loss = test_loss
-        torch.save(model.state_dict(), 'fine_tuned_model.pth')
+        torch.save(model.state_dict(), 'models/fine_tuned_model.pth')
 
 
 #save test loss and train loss

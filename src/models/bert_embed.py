@@ -6,7 +6,7 @@ from danlp.download import DEFAULT_CACHE_DIR, download_model, \
 import torch
 import warnings
 
-class BertBase:
+class BertEmbed:
     def __init__(self, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
         from transformers import BertTokenizer, BertModel
         import torch
@@ -27,13 +27,16 @@ class BertBase:
 
         marked_text = "[CLS] " + text + " [SEP]"
         tokenized_text = self.tokenizer.tokenize(marked_text)
+        if len(tokenized_text) > 512:
+            warnings.warn("The text is too long for BERT to handle. It will be truncated.")
+            tokenized_text = tokenized_text[:512]
 
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokenized_text)
 
         segments_ids = [1] * len(tokenized_text)
 
-        tokens_tensor = torch.tensor([indexed_tokens])
-        segments_tensors = torch.tensor([segments_ids])
+        tokens_tensor = torch.tensor([indexed_tokens]).to(self.model.device)  # Send tensor to the same device as the model
+        segments_tensors = torch.tensor([segments_ids]).to(self.model.device)  # Send tensor to the same device as the model
 
         with no_grad():
             outputs = self.model(tokens_tensor, segments_tensors)
