@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 from src.models.bert_embed import BertEmbed
 import torch
 from tqdm import tqdm
+import pickle
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
@@ -31,10 +32,23 @@ for filename in tqdm(os.listdir(file_dir), desc='Embedding paragraphs'):
             embeddings[filename] = file_embeddings
 
 # Save embeddings using h5py
-with h5py.File('embeddings.h5', 'w') as f:
-    for filename, file_embeddings in embeddings.items():
-        group = f.create_group(filename)
-        for index, embedding in file_embeddings:
-            group.create_dataset(str(index), data=embedding)
+saved_with_h5py = False
 
-print('Embeddings saved to embeddings.h5')
+try:
+    with h5py.File('embeddings.h5', 'w') as f:
+        for filename, file_embeddings in embeddings.items():
+            group = f.create_group(filename)
+            for index, embedding in file_embeddings:
+                group.create_dataset(str(index), data=embedding.cpu().numpy())
+    print('Embeddings saved to embeddings.h5')
+    saved_with_h5py = True
+except Exception as e:
+    print("Failed to save embeddings with h5py. Error:", e)
+
+if not saved_with_h5py:
+    try:
+        with open('embeddings.pickle', 'wb') as f:
+            pickle.dump(embeddings, f)
+        print("Embeddings saved to embeddings.pickle")
+    except Exception as e:
+        print("Failed to save embeddings with pickle. Error:", e)

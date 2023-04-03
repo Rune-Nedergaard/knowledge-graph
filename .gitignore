@@ -90,3 +90,5 @@ target/
 *.pickle
 src/deployment/api_secrets.py
 *.pth
+*.faiss
+*.h5

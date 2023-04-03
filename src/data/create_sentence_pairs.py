@@ -32,7 +32,7 @@ def get_question_chunk_pairs(data_folder, question_to_fil):
             paragraph_ids = [paragraph_ids]
 
         for paragraph_id in paragraph_ids:
-            paragraph_file = os.path.join(data_folder, "paragraphs", f"{paragraph_id}.txt")
+            paragraph_file = os.path.join(data_folder, "paragraphs_tokenized", f"{paragraph_id}.txt")#changed from paragraphs
             
             if not os.path.isfile(paragraph_file):
                 print(f"File not found: {paragraph_file}")

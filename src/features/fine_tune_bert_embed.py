@@ -11,9 +11,11 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from transformers import AdamW
 import os
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 
 # Create a directory to save checkpoints
-checkpoints_dir = 'checkpoints'
+checkpoints_dir = 'models/checkpoints'
 if not os.path.exists(checkpoints_dir):
     os.makedirs(checkpoints_dir)
 
@@ -204,7 +206,21 @@ def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        return checkpoint['train_losses'], checkpoint['test_losses']
+
+        train_losses_path = 'data/train_losses.pkl'
+        test_losses_path = 'data/test_losses.pkl'
+
+        if os.path.exists(train_losses_path) and os.path.exists(test_losses_path):
+            with open(train_losses_path, 'rb') as f:
+                train_losses = pickle.load(f)
+            with open(test_losses_path, 'rb') as f:
+                test_losses = pickle.load(f)
+
+            return train_losses, test_losses
+        else:
+            print(f"Train and test losses not found at: {train_losses_path} and {test_losses_path}")
+            return [], []
+
     else:
         print(f"Checkpoint not found at: {checkpoint_path}")
         return [], []
@@ -212,8 +228,14 @@ def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
 
 
 
-start_epoch = 2  # Set the epoch number from which you want to continue training (1-indexed)
+
+start_epoch = 3  # Set the epoch number from which you want to continue training (1-indexed)
 train_losses, test_losses = load_checkpoint(model, optimizer, checkpoints_dir, start_epoch)
+
+#Define learning rate scheduler
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.3, patience=2, verbose=True)
+print(f"Using learning rate scheduler: {scheduler}")
+
 
 if train_losses is None:
     train_losses = []
@@ -222,12 +244,8 @@ if train_losses is None:
 else:
     print(f"Continuing training from epoch {start_epoch}")
 
-
-
-
-
 # Fine-tune the model
-num_epochs = 2
+num_epochs = 6
 print(f"Fine-tuning the model for {num_epochs} epochs...")
 
 best_test_loss = float('inf')  # Initialize the best validation loss as infinity
@@ -253,6 +271,7 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
         probabilities = model(input_ids, attention_mask)
         loss = loss_function(probabilities, labels.float())
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) #added Gradient clipping
         optimizer.step()
 
         train_loss += loss.item()
@@ -281,6 +300,9 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
     test_losses.append(test_loss)
     
     print(f"Epoch {epoch + 1} Test Loss: {test_loss:.4f}")
+    
+    # Call the scheduler.step() function with the test_loss
+    scheduler.step(test_loss)
 
     checkpoint_path = os.path.join(checkpoints_dir, f'checkpoint_epoch_{epoch + 1}.pth')
     torch.save({
@@ -307,9 +329,9 @@ with open('data/test_losses.pkl', 'wb') as f:
 
 
 # Plot training and test losses
-plt.plot(train_losses, label="Train Loss")
-plt.plot(test_losses, label="Test Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
+# plt.plot(train_losses, label="Train Loss")
+# plt.plot(test_losses, label="Test Loss")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.legend()
+# plt.show()
