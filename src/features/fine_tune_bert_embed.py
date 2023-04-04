@@ -313,6 +313,14 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
         'test_loss_history': test_losses,
     }, checkpoint_path)
 
+    #save test loss and train loss
+    import pickle
+    with open('data/train_losses.pkl', 'wb') as f:
+        pickle.dump(train_losses, f)
+    with open('data/test_losses.pkl', 'wb') as f:
+        pickle.dump(test_losses, f)
+
+
     # Save the model if the test loss is lower than the best test loss
     if test_loss < best_test_loss:
         print(f"Improved test loss from {best_test_loss:.4f} to {test_loss:.4f}. Saving the model.")
@@ -322,12 +330,6 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
         model.save_pretrained(save_directory)
 
 
-#save test loss and train loss
-import pickle
-with open('data/train_losses.pkl', 'wb') as f:
-    pickle.dump(train_losses, f)
-with open('data/test_losses.pkl', 'wb') as f:
-    pickle.dump(test_losses, f)
 
 
 # Plot training and test losses
