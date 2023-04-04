@@ -3,6 +3,8 @@ import numpy as np
 import h5py
 import os
 import pickle
+import hashlib
+from tqdm import tqdm
 
 def load_embeddings(file_path):
     with h5py.File(file_path, 'r') as f:
@@ -14,13 +16,25 @@ def load_embeddings(file_path):
         embedding_matrix = np.empty((num_embeddings, dimension), dtype=np.float32)
         ids = []
 
+        # Use a set to keep track of unique embeddings
+        unique_embeddings = set()
+
         # Fill the embedding matrix and ID list
         i = 0
-        for filename, group in f.items():
+        for filename, group in tqdm(f.items(), total = len(f), desc='Loading embeddings'):
             for index, dataset in group.items():
-                embedding_matrix[i] = dataset[:]
-                ids.append(f"{filename}_{index}")
-                i += 1
+                # Compute a hash of the embedding as a string
+                embedding_hash = hashlib.sha256(np.ascontiguousarray(dataset[:]).tobytes()).hexdigest()
+                # Add the embedding and ID to the lists if it has not already been seen
+                if embedding_hash not in unique_embeddings:
+                    unique_embeddings.add(embedding_hash)
+                    ids.append(f"{filename}_{index}")
+                    embedding_matrix[i] = dataset[:]
+                    i += 1
+
+        # Truncate the embedding matrix and ID list to remove duplicates
+        embedding_matrix = embedding_matrix[:i]
+        ids = ids[:i]
 
     return embedding_matrix, ids
 

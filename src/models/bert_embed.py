@@ -7,13 +7,19 @@ import torch
 import warnings
 
 class BertEmbed:
-    def __init__(self, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
+    def __init__(self, model_path: str = None, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
         from transformers import BertTokenizer, BertModel
         import torch
-        # download model
-        self.path_model= download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func,verbose=verbose)
+
+        if model_path is not None:
+            self.path_model = model_path
+            self.pretrained = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
+        else:
+            # download model
+            self.path_model = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
+
         # Load pre-trained model tokenizer
-        self.tokenizer = BertTokenizer.from_pretrained(self.path_model)
+        self.tokenizer = BertTokenizer.from_pretrained(self.pretrained)
         # Load pre-trained model (weights)
         self.model = BertModel.from_pretrained(self.path_model,
                                           output_hidden_states = True, # Whether the model returns all hidden-states.

@@ -317,7 +317,9 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
     if test_loss < best_test_loss:
         print(f"Improved test loss from {best_test_loss:.4f} to {test_loss:.4f}. Saving the model.")
         best_test_loss = test_loss
-        torch.save(model.state_dict(), 'models/fine_tuned_model.pth')
+        save_directory = 'models/fine_tuned_model'
+        os.makedirs(save_directory, exist_ok=True)
+        model.save_pretrained(save_directory)
 
 
 #save test loss and train loss

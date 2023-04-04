@@ -7,18 +7,20 @@ import torch
 from tqdm import tqdm
 import pickle
 
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
 # Load the fine-tuned BERT model
 
-model = BertEmbed()
+fine_tuned_model_path = 'models/fine_tuned_model.pth'
+model = BertEmbed(model_path=fine_tuned_model_path)
 
 model.model.to(device)
 
 # Read paragraphs from files in the data/paragraphs folder and generate embeddings
 embeddings = {}
-file_dir = 'data/paragraphs'
+file_dir = 'data/paragraphs' #changed from paragraphs
 
 for filename in tqdm(os.listdir(file_dir), desc='Embedding paragraphs'):
     if filename.endswith('.txt'):
