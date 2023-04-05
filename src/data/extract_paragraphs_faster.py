@@ -13,7 +13,7 @@ import torch
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.models.bert_embed import BertEmbed
+#from src.models.bert_embed import BertEmbed
 
 
 #ids = [int(file.split('\\')[-1].split('.')[0]) for file in glob.glob('data/questions_rephrased/*.txt')]
@@ -31,7 +31,9 @@ text_files = Filtered_fil['id'].tolist()
 
 print(f"Processing {len(text_files)} files")
 
-model = BertEmbed()
+#model = BertEmbed()
+model = load_bert_base_model()
+
 
 newline_pattern = re.compile(r'\n')
 sentence_split_pattern = re.compile('[?.]')

@@ -24,12 +24,46 @@ class BertEmbed:
 
         # Load the pre-trained model (weights)
         model_state_dict = torch.load(self.path_model)
+
+        # Remove 'bert_model.' prefix from the fine-tuned model state dictionary keys
+        model_state_dict = {k.replace('bert_model.', ''): v for k, v in model_state_dict.items()}
+
+        # Remove the additional linear layer keys to make the architecture match the pretrained model
+        model_state_dict.pop('linear.bias', None)
+        model_state_dict.pop('linear.weight', None)
+
+
+        # Load the fine-tuned model
         self.model = BertModel.from_pretrained(
             self.pretrained,
             state_dict=model_state_dict,
             output_hidden_states=True,  # Whether the model returns all hidden-states.
         )
-        
+
+
+        """This is for debugging purposes only, but it seems to work fine now"""
+        # # Load a pretrained model for checking
+        # pretrained_model = BertModel.from_pretrained(self.pretrained, output_hidden_states=True)
+
+        # # Check if keys and parameter shapes are consistent between pretrained and fine-tuned model state dictionaries
+        # pretrained_keys = set(pretrained_model.state_dict().keys())
+        # fine_tuned_keys = set(model_state_dict.keys())
+
+        # sorted_pretrained_keys = sorted(list(pretrained_keys))
+        # sorted_fine_tuned_keys = sorted(list(fine_tuned_keys))
+
+        # if sorted_pretrained_keys != sorted_fine_tuned_keys:
+        #     raise ValueError("The keys in the pretrained and fine-tuned model state dictionaries do not match.")
+
+        # for key in pretrained_keys:
+        #     pretrained_shape = tuple(pretrained_model.state_dict()[key].shape)
+        #     fine_tuned_shape = tuple(model_state_dict[key].shape)
+
+        #     if pretrained_shape != fine_tuned_shape:
+        #         raise ValueError(f"Parameter shapes do not match for key: {key}\n"
+        #                         f"Pretrained shape: {pretrained_shape}, Fine-tuned shape: {fine_tuned_shape}")
+
+
     def embed_text(self, text):
         """
         Calculate the embeddings for the sentence based on a BERT language model.

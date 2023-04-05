@@ -5,6 +5,7 @@ This script takes a dict of rephrased questions and their semantic search result
 3. It saves these to a dataformat that a BERT model can read and fine tune
 """
 
+### I NEED TO ALSO KEEP TRACK OF THE IDS OF THE QUESTIONS I THINK -- PROBABLY ALSO THE PARAGRAPHS #####
 
 import openai
 from api_secrets import API_KEY
@@ -30,10 +31,23 @@ def process_question(question, list_of_paragraphs):
             response = openai.ChatCompletion.create(
                 model=MODEL,
                 messages=[
-                    {"role": "system", "content": "Du omskriver spørgsmål til mere generelle spørgsmål uden mange detaljer. Den omskrevne tekst skal minde om noget en normal person ville bruge til at søge efter information online og skal ikke være adresseret til nogen bestemt."},
-                    {"role": "user", "content": text},
+                    {"role": "system", "content": '''Du vurderer hvor relevante 4 forskellige paragraffer er i forhold til et givent input spørgsmål. Hver paragraf vurderes på en skala fra 0-1, hvor 0 er "slet ikke relevant" og 1 er "meget relevant". Svar uden yderligere forklaring med et decimaltal per paragraf, således:
+                    
+                    Paragraf 1: 0.3
+                    Pargraf 2: 0.9
+                    Paragraf 3: ....'''},
+
+                    {"role": "user", "content": ''''Input spørgsmål: {question}
+                    
+                    Paragraph 1: {list_of_paragraphs[0]}
+                    
+                    Paragraph 2: {list_of_paragraphs[1]}
+                    
+                    Paragraph 3: {list_of_paragraphs[2]}
+                    
+                    Paragraph 4: {list_of_paragraphs[3]}'''},
                 ],
-                temperature=0.5,
+                temperature=0,
                 max_tokens=100,
             )
 

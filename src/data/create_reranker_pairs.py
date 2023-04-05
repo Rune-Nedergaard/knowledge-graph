@@ -19,15 +19,16 @@ test = get_similar_paragraphs("Bør vi plante flere trær?", k=4, max_tokens=500
 #print(test)
 print(len(test))
 
-#Load the rephrased questions, by opening the question_chunk_pairs.pkl file and extracting the questions to a list
-with open('data/question_chunk_pairs.pkl', 'rb') as f:
-    question_chunk_pairs = pickle.load(f)
-
-questions = [q for q, _ in question_chunk_pairs]
+#Load the rephrased questions by opening all the files in the rephrased_questions folder and create a dict that maps the file name to the question
+rephrased_questions = {}
+for file in tqdm(os.listdir('data/rephrased_questions'), total = len(os.listdir('data/rephrased_questions'))):
+    filename = file.split('.')[0]
+    with open(os.path.join('data/rephrased_questions', file), 'r', encoding='utf-8') as f:
+        rephrased_questions[filename] = f.read()
 
 import random
-#Create a list of 20 random questions
-random_questions = random.sample(questions, 20)
+#Create a list of 10 random questions from the rephrased questions
+random_questions = random.sample(list(rephrased_questions.keys()), 10)
 
 #Feed each of the random questions to the semantic search function and create a dictionary of the results
 semantic_search_results = {}
