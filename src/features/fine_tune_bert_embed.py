@@ -327,7 +327,13 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
         best_test_loss = test_loss
         save_directory = 'models/fine_tuned_model'
         os.makedirs(save_directory, exist_ok=True)
-        model.save_pretrained(save_directory)
+        torch.save(model.state_dict(), os.path.join(save_directory, 'model.pt'))
+        try:
+            tokenizer.save_pretrained(save_directory)
+        except:
+            pass
+
+        
 
 
 

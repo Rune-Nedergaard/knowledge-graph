@@ -11,21 +11,25 @@ class BertEmbed:
         from transformers import BertTokenizer, BertModel
         import torch
 
+        # download pretrained model
+        self.pretrained = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
+
         if model_path is not None:
             self.path_model = model_path
-            self.pretrained = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
         else:
-            # download model
-            self.path_model = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
+            self.path_model = self.pretrained
 
         # Load pre-trained model tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(self.pretrained)
-        # Load pre-trained model (weights)
-        self.model = BertModel.from_pretrained(self.path_model,
-                                          output_hidden_states = True, # Whether the model returns all hidden-states.
-                                          )
 
-
+        # Load the pre-trained model (weights)
+        model_state_dict = torch.load(self.path_model)
+        self.model = BertModel.from_pretrained(
+            self.pretrained,
+            state_dict=model_state_dict,
+            output_hidden_states=True,  # Whether the model returns all hidden-states.
+        )
+        
     def embed_text(self, text):
         """
         Calculate the embeddings for the sentence based on a BERT language model.

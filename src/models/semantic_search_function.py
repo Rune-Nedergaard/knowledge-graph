@@ -24,15 +24,18 @@ def get_similar_paragraphs(query, k=6, max_tokens=500, before_percent=0.3):
     index_ivfflat = faiss.read_index('index_ivfflat.faiss')
 
     # Load the fine-tuned BERT model
-    model = load_bert_base_model()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model_path = 'models/fine_tuned_model.pth'
+    model = BertEmbed(model_path=model_path)
+    model.model.to(device)
 
     # Function to create embeddings for the query (question)
     def create_query_embeddings(query):
-        _, sentence_embedding, _ = model.embed_text(query)
+        sentence_embedding = model.embed_text(query)
         return sentence_embedding
 
     # Create embeddings for the query
-    query_embeddings = create_query_embeddings(query)
+    query_embeddings = create_query_embeddings(query).cpu()
     query_embeddings = np.reshape(query_embeddings, (1, -1))
 
     # Perform semantic search
@@ -110,3 +113,7 @@ def get_context_paragraphs(paragraphs, index, max_tokens=500, before_percent=0.3
     output = ' '.join(paragraphs[start_index:end_index + 1])
     return output
 
+
+if __name__ == '__main__':
+    test = get_similar_paragraphs('Hvad skal vi gøre med den stigende ældrebyrde?')
+    print(test)
