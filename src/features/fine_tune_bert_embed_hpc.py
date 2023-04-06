@@ -111,7 +111,7 @@ class QuestionChunkDataset(Dataset):
         # Insert special tokens
         tokens = [self.tokenizer.cls_token] + question_tokens + [self.tokenizer.sep_token] + paragraph_tokens + [self.tokenizer.sep_token]
         input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-
+    
         # Truncate or pad the token ids
         if len(input_ids) > self.max_seq_len:
             input_ids = input_ids[:self.max_seq_len]

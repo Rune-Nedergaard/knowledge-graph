@@ -75,7 +75,7 @@ semantic_search_results = {}
 for id in random_questions_ids:
     q = rephrased_questions[id]
     #saving as tuple with both a list of the paragraphs and the i
-    semantic_search_results[id] = (get_similar_paragraphs(q, k=4, max_tokens=450, before_percent=0.3, approximate=False, embedding_matrix=embeddings_matrix, ids=ids), q)
+    semantic_search_results[id] = (get_similar_paragraphs(q, k=7, max_tokens=450, before_percent=0.3, approximate=False, embedding_matrix=embeddings_matrix, ids=ids), q)
 
 #save the dictionary to a file
 with open('data/semantic_search_results.pkl', 'wb') as f:

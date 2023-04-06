@@ -33,17 +33,23 @@ Paragraph 2: {list_of_paragraphs[1]}
                     
 Paragraph 3: {list_of_paragraphs[2]}
                     
-Paragraph 4: {list_of_paragraphs[3]}'''
+Paragraph 4: {list_of_paragraphs[3]}
+
+Paragraph 5: {list_of_paragraphs[4]}
+
+Paragraph 6: {list_of_paragraphs[5]}
+
+Paragraph 7: {list_of_paragraphs[6]}'''
     REQUEST = template.format(question=question, list_of_paragraphs=list_of_paragraphs)
     #count the number of tokens in the request
   
-    while retry < 3:
+    while retry < 1:
         try:
             MODEL = "gpt-3.5-turbo"
             response = openai.ChatCompletion.create(
                 model=MODEL,
                 messages=[
-                    {"role": "system", "content": '''Du vurderer hvor relevante 4 forskellige paragraffer er i forhold til et givent input spørgsmål. Hver paragraf vurderes på en skala fra 0-1, hvor 0 er "slet ikke relevant" og 1 er "meget relevant". Det er sandsynligt at ingen er relevante, så vær hård i din vurdering og giv kun en høj score, hvis det faktisk er relevant. Svar uden yderligere forklaring med et decimaltal per paragraf, således:
+                    {"role": "system", "content": '''Du vurderer hvor relevante 7 forskellige paragraffer er i forhold til et givent input spørgsmål. Hver paragraf vurderes på en skala fra 0-1, hvor 0 er "slet ikke relevant" og 1 er "meget relevant". Det er sandsynligt at ingen er relevante, så vær hård i din vurdering og giv kun en høj score, hvis det faktisk er relevant. Svar uden yderligere forklaring med et decimaltal per paragraf, således:
                     
                     Paragraf 1: 0.1
                     Pargraf 2: 0.6

@@ -22,10 +22,12 @@ class BertEmbed:
             self.path_model = self.pretrained
 
         # Load pre-trained model tokenizer
-        self.tokenizer = BertTokenizer.from_pretrained(self.pretrained)
+        tokenizer_directory = self.path_model
+        self.tokenizer = BertTokenizer.from_pretrained(tokenizer_directory)
 
-        # Load the pre-trained model (weights)
-        model_state_dict = torch.load(self.path_model)
+        # Load the state dictionary of the fine-tuned model
+        model_file = os.path.join(self.path_model, 'model.pt')
+        model_state_dict = torch.load(model_file)
 
         # Remove 'bert_model.' prefix from the fine-tuned model state dictionary keys
         model_state_dict = {k.replace('bert_model.', ''): v for k, v in model_state_dict.items()}
@@ -34,14 +36,13 @@ class BertEmbed:
         model_state_dict.pop('linear.bias', None)
         model_state_dict.pop('linear.weight', None)
 
-
-        # Load the fine-tuned model
+        # Load the fine-tuned model with the modified state dictionary
+        config = BertConfig.from_pretrained(self.pretrained, output_hidden_states=True)
         self.model = BertModel.from_pretrained(
-            self.pretrained,
-            state_dict=model_state_dict,
-            output_hidden_states=True,  # Whether the model returns all hidden-states.
+            None,
+            config=config,
+            state_dict=model_state_dict
         )
-
 
         """This is for debugging purposes only, but it seems to work fine now"""
         # # Load a pretrained model for checking

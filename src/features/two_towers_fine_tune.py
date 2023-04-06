@@ -282,7 +282,7 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
     model.eval()
     test_loss = 0.0
     with torch.no_grad():
-        progress_bar = tqdm(test_loader, desc="Testing")
+        progress_bar = tqdm(val_loader, desc="Testing")
         for batch in progress_bar:
             question_input_ids = batch['question_input_ids'].to(device)
             question_attention_mask = batch['question_attention_mask'].to(device)
@@ -296,7 +296,7 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
             test_loss += loss.item()
             progress_bar.set_description(f"Testing (loss: {loss.item():.4f})")
 
-    test_loss /= len(test_loader)
+    test_loss /= len(val_loader)
     test_losses.append(test_loss)
 
     print(f"Epoch {epoch + 1} Test Loss: {test_loss:.4f}")

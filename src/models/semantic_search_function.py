@@ -19,7 +19,8 @@ import hashlib
 def get_similar_paragraphs(query, k=4, max_tokens=450, before_percent=0.3, approximate=True, embedding_matrix=None, ids=None):#last three are for exact search
     # Load the fine-tuned BERT model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model_path = 'models/fine_tuned_model.pth'
+    #model_path = 'models/fine_tuned_model.pth'
+    model_path = 'models/fine_tuned_model' #this is the new way of loading after I changed the saving process
     model = BertEmbed(model_path=model_path)
     model.model.to(device)
 
@@ -70,15 +71,20 @@ def get_similar_paragraphs(query, k=4, max_tokens=450, before_percent=0.3, appro
         # Opening the file
         with open(os.path.join('data/paragraphs', basename), 'r', encoding='utf-8') as f:
             paragraphs = f.read().split('\n')
+            similar_paragraphs.append(paragraphs[index])
             # Get the context paragraphs
-            context_paragraphs = get_context_paragraphs(paragraphs, index, max_tokens, before_percent)
-            similar_paragraphs.append(context_paragraphs)
+            #context_paragraphs = get_context_paragraphs(paragraphs, index, max_tokens, before_percent)
+            #similar_paragraphs.append(context_paragraphs)
 
     return similar_paragraphs
 
 
 def get_context_paragraphs(paragraphs, index, max_tokens=450, before_percent=0.3):
     # Convert paragraphs to raw text and print first 500 characters
+
+    """
+    DECIDED AGAINST USING THIS FUNCTION, DUE TO MANY REASONS
+    """
     current_paragraph = paragraphs[index]
     current_length = len(current_paragraph.split())
     remaining_tokens = max_tokens - current_length
@@ -125,5 +131,5 @@ def get_context_paragraphs(paragraphs, index, max_tokens=450, before_percent=0.3
 
 
 if __name__ == '__main__':
-    test = get_similar_paragraphs('Hvad skal vi gøre med den stigende ældrebyrde?')
+    test = get_similar_paragraphs('Hvad skal vi gøre med den stigende ældrebyrde?', k=7)
     print(test)
