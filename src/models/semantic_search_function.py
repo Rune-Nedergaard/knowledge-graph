@@ -9,20 +9,14 @@ from src.models.bert_embed import BertEmbed
 import torch
 from tqdm import tqdm
 import pickle
+import hashlib
 
-from danlp.models import load_bert_base_model
 
-"""
-# THIS NEEDS TO BE CHANGED TO THIS, BUT WORKING WITH PRETRAINED FOR NOW UNTIL FINE TUNED SAVING IS FIXED
-# Load the fine-tuned BERT model
-model = BertEmbed()
-model.model.to(device)
-"""
+#from danlp.models import load_bert_base_model
 
-def get_similar_paragraphs(query, k=6, max_tokens=500, before_percent=0.3):
-    # Load the saved index
-    index_ivfflat = faiss.read_index('index_ivfflat.faiss')
 
+
+def get_similar_paragraphs(query, k=4, max_tokens=450, before_percent=0.3, approximate=True, embedding_matrix=None, ids=None):#last three are for exact search
     # Load the fine-tuned BERT model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_path = 'models/fine_tuned_model.pth'
@@ -38,18 +32,33 @@ def get_similar_paragraphs(query, k=6, max_tokens=500, before_percent=0.3):
     query_embeddings = create_query_embeddings(query).cpu()
     query_embeddings = np.reshape(query_embeddings, (1, -1))
 
-    # Perform semantic search
-    D, I = index_ivfflat.search(query_embeddings, k)
+    if approximate:
+        # Load the saved index
+        index_ivfflat = faiss.read_index('index_ivfflat.faiss')
 
-    # Load the id_mapping_faiss.pickle
-    with open('id_mapping_faiss.pickle', 'rb') as f:
-        id_mapping_faiss = pickle.load(f)
+        # Perform semantic search
+        D, I = index_ivfflat.search(query_embeddings, k)
 
-    # Flip the keys and values in the dictionary
-    id_mapping_faiss = {v: k for k, v in id_mapping_faiss.items()}
+        # Load the id_mapping_faiss.pickle
+        with open('id_mapping_faiss.pickle', 'rb') as f:
+            id_mapping_faiss = pickle.load(f)
 
-    # Converting the indices to the actual file names
-    I = [id_mapping_faiss[i] for i in I[0]]
+        # Flip the keys and values in the dictionary
+        id_mapping_faiss = {v: k for k, v in id_mapping_faiss.items()}
+
+        # Converting the indices to the actual file names
+        I = [id_mapping_faiss[i] for i in I[0]]
+    else:
+        print("Using the slow exact search")
+
+        embedding_matrix = embedding_matrix
+        ids = ids
+        # Compute cosine similarity between query and all embeddings
+        D = np.dot(embedding_matrix, query_embeddings.T)
+        I = np.argsort(D, axis=0)[::-1][:k, 0].tolist()
+
+        # Convert indices to the actual file names
+        I = [ids[i] for i in I]
 
     similar_paragraphs = []
     # Open up the file and get the context paragraphs for each similar item
@@ -67,7 +76,8 @@ def get_similar_paragraphs(query, k=6, max_tokens=500, before_percent=0.3):
 
     return similar_paragraphs
 
-def get_context_paragraphs(paragraphs, index, max_tokens=500, before_percent=0.3):
+
+def get_context_paragraphs(paragraphs, index, max_tokens=450, before_percent=0.3):
     # Convert paragraphs to raw text and print first 500 characters
     current_paragraph = paragraphs[index]
     current_length = len(current_paragraph.split())

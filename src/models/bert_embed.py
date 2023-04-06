@@ -5,6 +5,8 @@ from danlp.download import DEFAULT_CACHE_DIR, download_model, \
     _unzip_process_func
 import torch
 import warnings
+from transformers import BertTokenizer, BertModel, BertConfig
+
 
 class BertEmbed:
     def __init__(self, model_path: str = None, cache_dir=DEFAULT_CACHE_DIR, verbose=False):

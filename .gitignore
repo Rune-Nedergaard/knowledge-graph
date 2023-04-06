@@ -92,3 +92,4 @@ src/deployment/api_secrets.py
 *.pth
 *.faiss
 *.h5
+*.pt
