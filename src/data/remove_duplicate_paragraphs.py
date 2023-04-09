@@ -137,8 +137,8 @@ def remove_duplicates(paragraphs, ids, embeddings_matrix, threshold):
 
 
 # Set the input and output directories
-input_folder = 'data/subset_paragraphs'
-output_folder = 'data/subset_paragraphs_filtered'
+input_folder = 'data/all_paragraphs'
+output_folder = 'data/all_paragraphs_filtered'
 
 # Create the output folder if it doesn't exist
 os.makedirs(output_folder, exist_ok=True)

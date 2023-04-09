@@ -1,36 +1,75 @@
-import os
+from torch import no_grad
+import os, re
+from typing import Union, List
+from danlp.download import DEFAULT_CACHE_DIR, download_model, \
+    _unzip_process_func
 import torch
-import random
-import numpy as np
-from torch.utils.data import DataLoader, Dataset, RandomSampler
-from transformers import BertForSequenceClassification, AdamW, get_linear_schedule_with_warmup
-from sklearn.metrics import mean_squared_error
+import warnings
 
-class BertReranker(BertBase):
-    def __init__(self, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
-        super().__init__(cache_dir, verbose)
-        self.model = BertForSequenceClassification.from_pretrained(
-            self.path_model,
-            num_labels=1
+class BertRerank:
+    def __init__(self, model_path: str = None, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
+        from transformers import BertTokenizer, BertModel
+        import torch
+
+        # download pretrained model
+        self.pretrained = download_model('bert.botxo.pytorch', cache_dir, process_func=_unzip_process_func, verbose=verbose)
+
+        if model_path is not None:
+            self.path_model = model_path
+        else:
+            self.path_model = self.pretrained
+
+        # Load pre-trained model tokenizer
+        self.tokenizer = BertTokenizer.from_pretrained(self.pretrained)
+
+        # Load the pre-trained model (weights)
+        model_state_dict = torch.load(self.path_model)
+
+        # Remove 'bert_model.' prefix from the fine-tuned model state dictionary keys
+        model_state_dict = {k.replace('bert_model.', ''): v for k, v in model_state_dict.items()}
+
+        # Load the fine-tuned model
+        self.model = BertModel.from_pretrained(
+            self.pretrained,
+            state_dict=model_state_dict,
+            output_hidden_states=True,  # Whether the model returns all hidden-states.
         )
-        self.model.eval()
 
-    def predict(self, questions, paragraphs):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(device)
-        self.model.eval()
+    def embed_question_paragraph(self, question, paragraph):
+        """
+        Calculate the embeddings for the question and paragraph based on a BERT language model.
+        """
 
-        dataset = RerankDataset(self.tokenizer, questions, paragraphs, [0] * len(questions))
-        dataloader = DataLoader(dataset, batch_size=16)
+        marked_text = "[CLS] " + question + " [SEP]" + paragraph + " [SEP]"
+        tokenized_text = self.tokenizer.tokenize(marked_text)
+        if len(tokenized_text) > 512:
+            warnings.warn("The text is too long for BERT to handle. It will be truncated.")
+            tokenized_text = tokenized_text[:512]
 
-        predictions = []
-        with torch.no_grad():
-            for batch in dataloader:
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
+        indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokenized_text)
 
-                outputs = self.model(input_ids, attention_mask=attention_mask)
-                logits = outputs.logits.squeeze().cpu().numpy()
-                predictions.extend(logits)
+        segments_ids = [0] * len(tokenized_text)
+        sep_idx = tokenized_text.index('[SEP]')
+        for i in range(sep_idx + 1, len(tokenized_text)):
+            segments_ids[i] = 1
 
-        return predictions
+        tokens_tensor = torch.tensor([indexed_tokens]).to(self.model.device)  # Send tensor to the same device as the model
+        segments_tensors = torch.tensor([segments_ids]).to(self.model.device)  # Send tensor to the same device as the model
+
+        with no_grad():
+            outputs = self.model(tokens_tensor, segments_tensors)
+            hidden_states = outputs[2]
+
+        # embeddings
+        question_embedding = torch.mean(hidden_states[-2][0, 1:sep_idx], dim=0)
+        paragraph_embedding = torch.mean(hidden_states[-2][0, sep_idx+1:-1], dim=0)
+
+        return question_embedding, paragraph_embedding
+
+    def predict_similarity(self, question, paragraph):
+        """
+        Calculate the similarity between a question and a paragraph using their embeddings.
+        """
+        question_embedding, paragraph_embedding = self.embed_question_paragraph(question, paragraph)
+        similarity = torch.cosine_similarity(question_embedding.unsqueeze(0), paragraph_embedding.unsqueeze(0)).item()
+        return similarity

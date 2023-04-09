@@ -5,8 +5,6 @@ from danlp.download import DEFAULT_CACHE_DIR, download_model, \
     _unzip_process_func
 import torch
 import warnings
-from transformers import BertTokenizer, BertModel, BertConfig
-
 
 class BertEmbed:
     def __init__(self, model_path: str = None, cache_dir=DEFAULT_CACHE_DIR, verbose=False):
@@ -22,12 +20,10 @@ class BertEmbed:
             self.path_model = self.pretrained
 
         # Load pre-trained model tokenizer
-        tokenizer_directory = self.path_model
-        self.tokenizer = BertTokenizer.from_pretrained(tokenizer_directory)
+        self.tokenizer = BertTokenizer.from_pretrained(self.pretrained)
 
-        # Load the state dictionary of the fine-tuned model
-        model_file = os.path.join(self.path_model, 'model.pt')
-        model_state_dict = torch.load(model_file)
+        # Load the pre-trained model (weights)
+        model_state_dict = torch.load(self.path_model)
 
         # Remove 'bert_model.' prefix from the fine-tuned model state dictionary keys
         model_state_dict = {k.replace('bert_model.', ''): v for k, v in model_state_dict.items()}
@@ -36,13 +32,14 @@ class BertEmbed:
         model_state_dict.pop('linear.bias', None)
         model_state_dict.pop('linear.weight', None)
 
-        # Load the fine-tuned model with the modified state dictionary
-        config = BertConfig.from_pretrained(self.pretrained, output_hidden_states=True)
+
+        # Load the fine-tuned model
         self.model = BertModel.from_pretrained(
-            None,
-            config=config,
-            state_dict=model_state_dict
+            self.pretrained,
+            state_dict=model_state_dict,
+            output_hidden_states=True,  # Whether the model returns all hidden-states.
         )
+
 
         """This is for debugging purposes only, but it seems to work fine now"""
         # # Load a pretrained model for checking

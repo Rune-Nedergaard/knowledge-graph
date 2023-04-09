@@ -6,8 +6,9 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 import pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.models.bert_embed import BertEmbed
-
+from danlp.download import DEFAULT_CACHE_DIR, download_model, \
+    _unzip_process_func
+from danlp.models import load_bert_base_model
 
 class ParagraphDataset(Dataset):
     def __init__(self, file_dir):
@@ -34,7 +35,7 @@ def embed_and_save(model, data_loader, device):
         for filename, paragraphs in zip(filenames, paragraphs_list):
             file_embeddings = []
             for index, paragraph in enumerate(paragraphs):
-                embedding = model.embed_text(paragraph)
+                _, embedding, = model.embed_text(paragraph)
                 file_embeddings.append((index, embedding))
             embeddings[filename] = file_embeddings
 
@@ -44,14 +45,16 @@ def embed_and_save(model, data_loader, device):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
-fine_tuned_model_path = 'models/fine_tuned_model/check7_model.pth'
-model = BertEmbed(model_path=fine_tuned_model_path)
-
+model = load_bert_base_model()
 model.model.to(device)
+tokenizer = model.tokenizer
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 
 file_dir = 'data/all_paragraphs/paragraphs'
 dataset = ParagraphDataset(file_dir)
-data_loader = DataLoader(dataset, batch_size=64, collate_fn=collate_fn)
+data_loader = DataLoader(dataset, batch_size=16, collate_fn=collate_fn)
 
 embeddings = embed_and_save(model, data_loader, device)
 

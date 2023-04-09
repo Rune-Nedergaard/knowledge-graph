@@ -9,7 +9,8 @@ from tqdm import tqdm
 from transformers import AdamW
 from danlp.models import load_bert_base_model
 from danlp.models.bert_models import BertBase as DaNLPBertBase
-
+import numpy as np
+import random
 # Create a directory to save checkpoints
 checkpoints_dir = 'models/two_tower_checkpoints'
 if not os.path.exists(checkpoints_dir):
@@ -179,18 +180,11 @@ class TwoTowerSimilarityModel(nn.Module):
 
 if __name__ == "__main__":
 
-    two_tower_model = TwoTowerModel(bert_model_question, bert_model_paragraph).to(device)
-    two_tower_similarity_model = TwoTowerSimilarityModel(two_tower_model).to(device)
-
-
+     # Define dataset
     question_chunk_dataset = QuestionChunkDataset(dataset, labels, tokenizer=danish_bert_question.tokenizer, max_seq_len=512, device=device)
-
-
-    # Define the loss function and optimizer
+    
+    #Define loss
     loss_function = nn.BCELoss()
-    optimizer = AdamW(two_tower_similarity_model.parameters(), lr=2e-5, weight_decay=0.01)
-
-
     # Split your data into training, validation, and test sets
     train_size = int(0.8 * len(question_chunk_dataset))
     val_size = int(0.1 * len(question_chunk_dataset))
@@ -202,41 +196,108 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_data, batch_size=2, shuffle=False,  drop_last=True)
     test_loader = DataLoader(test_data, batch_size=2, shuffle=False,  drop_last=True)
 
-    def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
-        checkpoint_path = os.path.join(checkpoints_dir, f'checkpoint_epoch_{epoch}.pth')
-        if os.path.exists(checkpoint_path):
-            checkpoint = torch.load(checkpoint_path)
-            two_tower_similarity_model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
-            train_losses_path = 'data/train_losses.pkl'
-            test_losses_path = 'data/test_losses.pkl'
+    num_seeds = 15
+    steps_per_seed = 3000
+    steps_for_testing = 1000
 
-            if os.path.exists(train_losses_path) and os.path.exists(test_losses_path):
-                with open(train_losses_path, 'rb') as f:
-                    train_losses = pickle.load(f)
-                with open(test_losses_path, 'rb') as f:
-                    test_losses = pickle.load(f)
+    best_seed = None
+    best_loss = float('inf')
 
-                return train_losses, test_losses
-            else:
-                print(f"Train and test losses not found at: {train_losses_path} and {test_losses_path}")
-                return [], []
+    # Finding the best seed
+    for seed in range(num_seeds):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
 
-        else:
-            print(f"Checkpoint not found at: {checkpoint_path}")
-            return [], []
+        two_tower_model = TwoTowerModel(bert_model_question, bert_model_paragraph).to(device)
+        two_tower_similarity_model = TwoTowerSimilarityModel(two_tower_model).to(device)
+
+        # Define the loss function and optimizer
+        loss_function = nn.BCELoss()
+        optimizer = AdamW(two_tower_similarity_model.parameters(), lr=2e-5, weight_decay=0.01)
+
+        print(f"Testing seed {seed + 1}/{num_seeds}")
+        two_tower_similarity_model.train()
+        train_loss = 0
+        steps = 0
+
+        progress_bar = tqdm(train_loader, desc="Training", total=steps_per_seed)
+
+        for batch in progress_bar:
+            optimizer.zero_grad()
+            question_input_ids = batch['question_input_ids'].to(device)
+            question_attention_mask = batch['question_attention_mask'].to(device)
+            paragraph_input_ids = batch['paragraph_input_ids'].to(device)
+            paragraph_attention_mask = batch['paragraph_attention_mask'].to(device)
+            labels = batch['label'].to(device)
+            
+            similarities = two_tower_similarity_model(question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask)
+            loss = loss_function((similarities + 1) / 2, labels)  # Scale similarities to [0, 1] for BCELoss
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(two_tower_similarity_model.parameters(), max_norm=1.0)  # Added Gradient clipping
+            optimizer.step()
+
+            train_loss += loss.item()
+            progress_bar.set_description(f"Training (loss: {loss.item():.4f})")
+
+            steps += 1
+            if steps >= steps_per_seed:
+                break
+
+        train_loss /= steps
+
+        # Test loop
+        two_tower_similarity_model.eval()
+        test_loss = 0.0
+        test_steps = 0
+        with torch.no_grad():
+            progress_bar = tqdm(val_loader, desc="Testing", total=steps_for_testing)
+            for batch in progress_bar:
+                question_input_ids = batch['question_input_ids'].to(device)
+                question_attention_mask = batch['question_attention_mask'].to(device)
+                paragraph_input_ids = batch['paragraph_input_ids'].to(device)
+                paragraph_attention_mask = batch['paragraph_attention_mask'].to(device)
+                labels = batch['label'].to(device)
+
+                similarities = two_tower_similarity_model(question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask)
+                loss = loss_function((similarities + 1) / 2, labels)  # Scale similarities to [0, 1] for BCELoss
+
+                test_loss += loss.item()
+                progress_bar.set_description(f"Testing (loss: {loss.item():.4f})")
+
+                test_steps += 1
+                if test_steps >= steps_for_testing:
+                    break
+
+        test_loss /= len(val_loader)
+
+        print(f"Seed {seed + 1} Test Loss: {test_loss:.4f}")
+
+        if test_loss < best_loss:
+            best_loss = test_loss
+            best_seed = seed
+
+    print(f"Best seed:{best_seed} with Test Loss: {best_loss:.4f}")
 
 
+    two_tower_model = TwoTowerModel(bert_model_question, bert_model_paragraph).to(device)
+    two_tower_similarity_model = TwoTowerSimilarityModel(two_tower_model).to(device)
+
+    # Define the optimizer
+    
+    optimizer = AdamW(two_tower_similarity_model.parameters(), lr=2e-5, weight_decay=0.01)
+
+ 
 
 
 
     start_epoch = 1  # Set the epoch number from which you want to continue training (1-indexed)
 
-    if start_epoch > 1:
-        train_losses, test_losses = load_checkpoint(two_tower_similarity_model, optimizer, checkpoints_dir, start_epoch)
-    else:
-        train_losses, test_losses = [], []
+
+    train_losses, test_losses = [], []
     #Define learning rate scheduler
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.3, patience=2, verbose=True)
 
@@ -326,7 +387,7 @@ if __name__ == "__main__":
             best_test_loss = test_loss
             save_directory = 'models/fine_tuned_model_two_tower'
             os.makedirs(save_directory, exist_ok=True)
-            torch.save(two_tower_similarity_model.state_dict(), os.path.join(save_directory, 'model.pt'))
+            torch.save(two_tower_similarity_model, os.path.join(save_directory, 'model.pt'))
             try:
                 tokenizer.save_pretrained(save_directory)
             except:
