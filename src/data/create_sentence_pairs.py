@@ -7,14 +7,6 @@ with open('data/raw/question_to_fil_filtered.pkl', 'rb') as f:
 
 data_folder = 'data'
 
-# def read_file(file_path):
-#     try:
-#         with open(file_path, 'r', encoding='iso-8859-1') as f:
-#             return f.read()
-#     except FileNotFoundError:
-#         print(f"File not found: {file_path}")
-#         return None
-
 def get_question_chunk_pairs(data_folder, question_to_fil):
     question_chunk_pairs = []
 
@@ -32,8 +24,8 @@ def get_question_chunk_pairs(data_folder, question_to_fil):
             paragraph_ids = [paragraph_ids]
 
         for paragraph_id in paragraph_ids:
-            paragraph_file = os.path.join(data_folder, "subset_paragraphs_filtered", f"{paragraph_id}.txt")#changed from paragraphs
-            
+            paragraph_file = os.path.join(data_folder, "all_paragraphs_large_removed/paragraphs", f"{paragraph_id}.txt")
+
             if not os.path.isfile(paragraph_file):
                 print(f"File not found: {paragraph_file}")
                 continue
@@ -42,18 +34,14 @@ def get_question_chunk_pairs(data_folder, question_to_fil):
                 paragraphs = p_file.read().split("\n")
 
             for paragraph in paragraphs:
-                question_chunk_pairs.append((question, paragraph))
+                if paragraph:  # Check if paragraph is not empty
+                    question_chunk_pairs.append((question, paragraph))
 
     return question_chunk_pairs
-
-
-
 
 data_folder = 'data'
 
 question_chunk_pairs = get_question_chunk_pairs(data_folder, question_to_fil)
 #save as pickle
-with open(os.path.join(data_folder, 'question_chunk_pairs.pkl'), 'wb') as f:
+with open(os.path.join(data_folder, 'big_question_chunk_pairs.pkl'), 'wb') as f:
     pickle.dump(question_chunk_pairs, f)
-
-

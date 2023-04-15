@@ -11,6 +11,9 @@ from danlp.models import load_bert_base_model
 from danlp.models.bert_models import BertBase as DaNLPBertBase
 import numpy as np
 import random
+from sentence_transformers import losses
+from sentence_transformers.losses import MultipleNegativesRankingLoss
+import random
 
 
 # Create a directory to save checkpoints
@@ -28,9 +31,6 @@ else:
 """
 Inserting BertBase with modifications here, in order not to interfere with the original fine tuning script
 """
-
-
-
 
 
 class BertCustomBase(DaNLPBertBase):
@@ -90,8 +90,8 @@ tokenizer = danish_bert_question.tokenizer
 bert_model_question = danish_bert_question.model.to(device)
 bert_model_paragraph = danish_bert_paragraph.model.to(device)
 
-dataset = pickle.load(open('data/fine_tune_dataset.pkl', 'rb'))
-labels = pickle.load(open('data/fine_tune_labels.pkl', 'rb'))
+
+dataset = pickle.load(open('data/big_question_chunk_pairs.pkl', 'rb'))
 
 class TwoTowerModel(nn.Module):
     def __init__(self, question_model, paragraph_model):
@@ -110,55 +110,72 @@ class TwoTowerModel(nn.Module):
         return pooled_output
     
 class QuestionChunkDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer, max_seq_len=512, device=device):
-        self.texts = texts
-        self.labels = labels
+    def __init__(self, data, tokenizer, max_seq_len=512, device=device, negative_sampling=True):
+        self.data = data
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
         self.device = device
+        self.negative_sampling = negative_sampling
         
     def __len__(self):
-        return len(self.labels)
+        return len(self.data)
+    
+    def sample_negative(self, positive_idx):
+        negative_idx = random.choice(range(len(self.data)))
+        while negative_idx == positive_idx:
+            negative_idx = random.choice(range(len(self.data)))
+        return self.data[negative_idx][1]
 
     def __getitem__(self, idx):
-        question, paragraph = self.texts[idx]
+        question, positive_paragraph = self.data[idx]
+        if self.negative_sampling:
+            negative_paragraph = self.sample_negative(idx)
+        else:
+            negative_paragraph = ""
 
         question_tokenized = self.tokenizer.tokenize(question)
-        paragraph_tokenized = self.tokenizer.tokenize(paragraph)
+        positive_paragraph_tokenized = self.tokenizer.tokenize(positive_paragraph)
+        negative_paragraph_tokenized = self.tokenizer.tokenize(negative_paragraph)
 
         question_input_ids = self.tokenizer.convert_tokens_to_ids(question_tokenized)
-        paragraph_input_ids = self.tokenizer.convert_tokens_to_ids(paragraph_tokenized)
+        positive_paragraph_input_ids = self.tokenizer.convert_tokens_to_ids(positive_paragraph_tokenized)
+        negative_paragraph_input_ids = self.tokenizer.convert_tokens_to_ids(negative_paragraph_tokenized)
 
         max_seq_len = self.max_seq_len
         question_input_ids = question_input_ids[:max_seq_len]
-        paragraph_input_ids = paragraph_input_ids[:max_seq_len]
+        positive_paragraph_input_ids = positive_paragraph_input_ids[:max_seq_len]
+        negative_paragraph_input_ids = negative_paragraph_input_ids[:max_seq_len]
 
-
-        # Calculate the maximum sequence length for question and paragraph separately
         max_question_seq_len = min(len(question_input_ids), self.max_seq_len)
-        max_paragraph_seq_len = min(len(paragraph_input_ids), self.max_seq_len)
+        max_positive_paragraph_seq_len = min(len(positive_paragraph_input_ids), self.max_seq_len)
+        max_negative_paragraph_seq_len = min(len(negative_paragraph_input_ids), self.max_seq_len)
 
-        # Truncate or pad the token ids for question and paragraph separately
         question_input_ids = question_input_ids[:max_question_seq_len] + [self.tokenizer.pad_token_id] * (self.max_seq_len - max_question_seq_len)
-        paragraph_input_ids = paragraph_input_ids[:max_paragraph_seq_len] + [self.tokenizer.pad_token_id] * (self.max_seq_len - max_paragraph_seq_len)
+        positive_paragraph_input_ids = positive_paragraph_input_ids[:max_positive_paragraph_seq_len] + [self.tokenizer.pad_token_id] * (self.max_seq_len - max_positive_paragraph_seq_len)
+        negative_paragraph_input_ids = negative_paragraph_input_ids[:max_negative_paragraph_seq_len] + [self.tokenizer.pad_token_id] * (self.max_seq_len - max_negative_paragraph_seq_len)
 
-        # Create attention masks
         question_attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in question_input_ids]
-        paragraph_attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in paragraph_input_ids]
+        positive_paragraph_attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in positive_paragraph_input_ids]
+        negative_paragraph_attention_mask = [1 if token_id != self.tokenizer.pad_token_id else 0 for token_id in negative_paragraph_input_ids]
 
-        # Move tensors to the correct device
         question_input_ids = torch.tensor(question_input_ids).to(self.device)
         question_attention_mask = torch.tensor(question_attention_mask).to(self.device)
-        paragraph_input_ids = torch.tensor(paragraph_input_ids).to(self.device)
-        paragraph_attention_mask = torch.tensor(paragraph_attention_mask).to(self.device)
+        positive_paragraph_input_ids = torch.tensor(positive_paragraph_input_ids).to(self.device)
+        positive_paragraph_attention_mask = torch.tensor(positive_paragraph_attention_mask).to(self.device)
+        negative_paragraph_input_ids = torch.tensor(negative_paragraph_input_ids).to(self.device)
+        negative_paragraph_attention_mask = torch.tensor(negative_paragraph_attention_mask).to(self.device)
+
+        # The positive example is always the first one. The loss function expects the label to be the index of the positive example.
+        label = torch.tensor(0).to(self.device)
 
         return {
             'question_input_ids': question_input_ids,
             'question_attention_mask': question_attention_mask,
-            'paragraph_input_ids': paragraph_input_ids,
-            'paragraph_attention_mask': paragraph_attention_mask,
-            'label': torch.tensor(self.labels[idx], dtype=torch.float32).to(self.device),
+            'paragraph_input_ids': torch.stack([positive_paragraph_input_ids, negative_paragraph_input_ids]),
+            'paragraph_attention_mask': torch.stack([positive_paragraph_attention_mask, negative_paragraph_attention_mask]),
+            'label': label,
         }
+
 
 
     
@@ -169,24 +186,25 @@ class TwoTowerSimilarityModel(nn.Module):
         self.two_tower_model = two_tower_model
         self.cosine_similarity = nn.CosineSimilarity(dim=1)
 
-    def forward(self, question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask, return_embeddings=False):
+    def forward(self, question_input_ids, question_attention_mask, paragraph_input_ids_list, paragraph_attention_mask_list):
         question_embedding = self.two_tower_model.forward_question(question_input_ids, question_attention_mask)
-        paragraph_embedding = self.two_tower_model.forward_paragraph(paragraph_input_ids, paragraph_attention_mask)
+        
+        paragraph_embeddings = []
+        for paragraph_input_ids, paragraph_attention_mask in zip(paragraph_input_ids_list, paragraph_attention_mask_list):
+            paragraph_embedding = self.two_tower_model.forward_paragraph(paragraph_input_ids, paragraph_attention_mask)
+            paragraph_embeddings.append(paragraph_embedding)
 
-        if return_embeddings:
-            return question_embedding, paragraph_embedding
+        return question_embedding, paragraph_embeddings
 
-        cosine_sim = self.cosine_similarity(question_embedding, paragraph_embedding)
-        return cosine_sim
+
 
 
 if __name__ == "__main__":
 
      # Define dataset
-    question_chunk_dataset = QuestionChunkDataset(dataset, labels, tokenizer=danish_bert_question.tokenizer, max_seq_len=512, device=device)
+    question_chunk_dataset = QuestionChunkDataset(dataset, tokenizer=danish_bert_question.tokenizer, max_seq_len=512, device=device)
     
-    #Define loss
-    loss_function = nn.BCELoss()
+
     # Split your data into training, validation, and test sets
     train_size = int(0.8 * len(question_chunk_dataset))
     val_size = int(0.1 * len(question_chunk_dataset))
@@ -218,7 +236,7 @@ if __name__ == "__main__":
         two_tower_similarity_model = TwoTowerSimilarityModel(two_tower_model).to(device)
 
         # Define the loss function and optimizer
-        loss_function = nn.BCELoss()
+        loss_function = losses.MultipleNegativesRankingLoss(model=TwoTowerSimilarityModel)
         optimizer = AdamW(two_tower_similarity_model.parameters(), lr=2e-5, weight_decay=0.01)
 
         print(f"Testing seed {seed + 1}/{num_seeds}")
@@ -236,8 +254,14 @@ if __name__ == "__main__":
             paragraph_attention_mask = batch['paragraph_attention_mask'].to(device)
             labels = batch['label'].to(device)
             
+            print("question_input_ids.shape:", question_input_ids.shape)
+            print("question_attention_mask.shape:", question_attention_mask.shape)
+            print("paragraph_input_ids.shape:", paragraph_input_ids.shape)
+            print("paragraph_attention_mask.shape:", paragraph_attention_mask.shape)
+
+
             similarities = two_tower_similarity_model(question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask)
-            loss = loss_function((similarities + 1) / 2, labels)  # Scale similarities to [0, 1] for BCELoss
+            loss = loss_function(similarities, labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(two_tower_similarity_model.parameters(), max_norm=1.0)  # Added Gradient clipping
             optimizer.step()
@@ -284,7 +308,13 @@ if __name__ == "__main__":
 
     print(f"Best seed:{best_seed} with Test Loss: {best_loss:.4f}")
 
+    torch.manual_seed(best_seed)
+    np.random.seed(best_seed)
+    random.seed(best_seed)
+    torch.cuda.manual_seed_all(best_seed)
+    torch.backends.cudnn.deterministic = True
 
+    print(f"Training the model with the best seed: {best_seed}...")
     two_tower_model = TwoTowerModel(bert_model_question, bert_model_paragraph).to(device)
     two_tower_similarity_model = TwoTowerSimilarityModel(two_tower_model).to(device)
 
@@ -327,7 +357,8 @@ if __name__ == "__main__":
             labels = batch['label'].to(device)
             
             similarities = two_tower_similarity_model(question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask)
-            loss = loss_function((similarities + 1) / 2, labels)  # Scale similarities to [0, 1] for BCELoss
+            loss = loss_function(similarities, labels)
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(two_tower_similarity_model.parameters(), max_norm=1.0)  # Added Gradient clipping
             optimizer.step()
@@ -353,8 +384,7 @@ if __name__ == "__main__":
                 labels = batch['label'].to(device)
 
                 similarities = two_tower_similarity_model(question_input_ids, question_attention_mask, paragraph_input_ids, paragraph_attention_mask)
-                loss = loss_function((similarities + 1) / 2, labels)  # Scale similarities to [0, 1] for BCELoss
-
+                loss = loss_function(similarities, labels)
                 test_loss += loss.item()
                 progress_bar.set_description(f"Testing (loss: {loss.item():.4f})")
 

@@ -44,12 +44,13 @@ def embed_and_save(model, data_loader, device):
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
-fine_tuned_model_path = 'models/fine_tuned_model/check7_model.pth'
+fine_tuned_model_path = 'models/fine_tuned_model/check_highbatch2_model.pth'
 model = BertEmbed(model_path=fine_tuned_model_path)
 
 model.model.to(device)
 
-file_dir = 'data/all_paragraphs/paragraphs'
+file_dir = 'data/subset_paragraphs_filtered'
+#file_dir = 'data/all_paragraphs/paragraphs'
 dataset = ParagraphDataset(file_dir)
 data_loader = DataLoader(dataset, batch_size=64, collate_fn=collate_fn)
 

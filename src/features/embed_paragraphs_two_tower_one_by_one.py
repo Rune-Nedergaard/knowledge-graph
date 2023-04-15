@@ -8,10 +8,8 @@ import pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.features.two_towers_fine_tune_seed_optimization import BertCustomBase, TwoTowerSimilarityModel, TwoTowerModel
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
-# Load BaseBert for tokenization in dataset class get item
 danish_bert_question = BertCustomBase(device)
 tokenizer = danish_bert_question.tokenizer
 
@@ -48,36 +46,52 @@ def collate_fn(batch):
     filenames, paragraphs_list, attention_masks_list = zip(*batch)
     return filenames, paragraphs_list, attention_masks_list
 
+def embedding_file_exists(folder, filename, index):
+    filepath = os.path.join(folder, f"{filename}_{index}.npy")
+    return os.path.isfile(filepath)
 
-def embed_and_save(model, data_loader, device):
-    embeddings = {}
+def save_embedding_to_folder(folder, filename, index, embedding):
+    os.makedirs(folder, exist_ok=True)
+    filepath = os.path.join(folder, f"{filename}_{index}.npy")
+    torch.save(embedding.cpu().numpy(), filepath)
+
+def embed_and_save(model, data_loader, device, embeddings_folder):
     for filenames, paragraphs_list, attention_masks_list in tqdm(data_loader, desc='Embedding paragraphs'):
         for filename, paragraphs, attention_masks in zip(filenames, paragraphs_list, attention_masks_list):
-            file_embeddings = []
             for index, (paragraph, attention_mask) in enumerate(zip(paragraphs, attention_masks)):
-                inputs = {'input_ids': paragraph.unsqueeze(0), 'attention_mask': attention_mask.unsqueeze(0)}
-                with torch.no_grad():
-                    paragraph_embedding = model.two_tower_model.forward_paragraph(**inputs)
-                file_embeddings.append((index, paragraph_embedding))
-            embeddings[filename] = file_embeddings
+                if not embedding_file_exists(embeddings_folder, filename, index):
+                    inputs = {'input_ids': paragraph.unsqueeze(0), 'attention_mask': attention_mask.unsqueeze(0)}
+                    with torch.no_grad():
+                        paragraph_embedding = model.two_tower_model.forward_paragraph(**inputs)
+                    save_embedding_to_folder(embeddings_folder, filename, index, paragraph_embedding)
+
+def load_embeddings_from_folder(embeddings_folder):
+    embeddings = {}
+    for file in os.listdir(embeddings_folder):
+        if file.endswith(".npy"):
+            filename, index = file[:-4].rsplit('_', 1)
+            index = int(index)
+            if filename not in embeddings:
+                embeddings[filename] = []
+            embeddings[filename].append((index, torch.from_numpy(torch.load(os.path.join(embeddings_folder, file)))))
+
+    for filename in embeddings.keys():
+        embeddings[filename].sort(key=lambda x: x[0])
 
     return embeddings
 
-
-
-# Load the TwoTowerModel
 two_tower_model_path = 'models/fine_tuned_model_two_tower/model.pt'
 
-# Initialize TwoTowerSimilarityModel
 model = torch.load(two_tower_model_path)
 
-file_dir = 'data/subset_paragraphs_filtered'
+file_dir = 'data/paragraphs'
 dataset = ParagraphDataset(file_dir)
-data_loader = DataLoader(dataset, batch_size=64, collate_fn=collate_fn)
+data_loader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn, num_workers=0, shuffle=True)
 
-embeddings = embed_and_save(model, data_loader, device)
+embeddings_folder = 'data/embeddings'
+embed_and_save(model, data_loader, device, embeddings_folder)
+embeddings = load_embeddings_from_folder(embeddings_folder)
 
-saved_with_h5py = False
 try:
     with h5py.File('two_tower_embeddings.h5', 'w') as f:
         for filename, file_embeddings in embeddings.items():
@@ -85,11 +99,9 @@ try:
             for index, embedding in file_embeddings:
                 group.create_dataset(str(index), data=embedding.cpu().numpy())
     print('Embeddings saved to embeddings.h5')
-    saved_with_h5py = True
 except Exception as e:
     print("Failed to save embeddings with h5py. Error:", e)
 
-if not saved_with_h5py:
     try:
         with open('two_tower.pickle', 'wb') as f:
             pickle.dump(embeddings, f)

@@ -19,8 +19,8 @@ import hashlib
 def get_similar_paragraphs(query, k=4, max_tokens=500, before_percent=0.3, approximate=True, embedding_matrix=None, ids=None):#last three are for exact search
     # Load the fine-tuned BERT model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    #model_path = 'models/fine_tuned_model.pth'
-    model_path = 'models/fine_tuned_model/check7_model.pth' #this is the new way of loading after I changed the saving process
+    #model_path = 'models/fine_tuned_model/model.pth'
+    model_path = 'models/fine_tuned_model/check_highbatch2_model.pth' #this is the new way of loading after I changed the saving process
     model = BertEmbed(model_path=model_path)
     model.model.to(device)
 
@@ -69,7 +69,7 @@ def get_similar_paragraphs(query, k=4, max_tokens=500, before_percent=0.3, appro
         # Getting the index
         index = int(i.split('_')[1])
         # Opening the file
-        with open(os.path.join('data/paragraphs', basename), 'r', encoding='utf-8') as f:
+        with open(os.path.join('data/all_paragraphs/paragraphs', basename), 'r', encoding='utf-8') as f:
             paragraphs = f.read().split('\n')
             similar_paragraphs.append(paragraphs[index])
             # Get the context paragraphs

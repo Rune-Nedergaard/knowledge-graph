@@ -144,13 +144,15 @@ def process_file(file):
     if os.path.exists(output_file):
         #print(f"{output_file} already exists, skipping processing for this file.")
         return
-
-    with open(f'data/processed/{file}.txt', 'r', encoding='utf-8') as f:
-        text = f.read()
-    paragraphs = split_into_paragraphs(text, model=model)
-    with open(f'data/paragraphs/{file}.txt', 'w', encoding='utf-8') as f:
-        for paragraph in paragraphs:
-            f.write(paragraph + '\n')
+    try:
+        with open(f'data/processed/{file}.txt', 'r', encoding='utf-8') as f:
+            text = f.read()
+        paragraphs = split_into_paragraphs(text, model=model)
+        with open(f'data/paragraphs/{file}.txt', 'w', encoding='utf-8') as f:
+            for paragraph in paragraphs:
+                f.write(paragraph + '\n')
+    except Exception as e:
+        print(f"Error processing {file}: {e}")
 
 if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:

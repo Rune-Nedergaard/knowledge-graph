@@ -46,11 +46,22 @@ if torch.cuda.device_count() > 1:
     model = nn.DataParallel(model)
 model = model.to(device)
 
+def remove_module_prefix(state_dict):
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        new_key = key.replace('module.', '')  # Remove the 'module.' prefix
+        new_state_dict[new_key] = value
+    return new_state_dict
+
 def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
     checkpoint_path = os.path.join(checkpoints_dir, f'checkpoint_epoch_{epoch}.pth')
     if os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        
+        #removing the module prefix is necessary when the model was fine tuned on multuple GPUs
+        model_state_dict = remove_module_prefix(checkpoint['model_state_dict'])
+        
+        model.load_state_dict(model_state_dict)
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
         train_losses_path = 'data/train_losses.pkl'
@@ -72,11 +83,11 @@ def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
         return [], []
 
 
-checkpoints_dir = 'models/checkpoints'
+checkpoints_dir = 'models/checkpoint_highbatch'
 
 optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.001)
 
-start_epoch = 7  # Set the epoch number from which you want to continue training (1-indexed)
+start_epoch = 2  # Set the epoch number from which you want to continue training (1-indexed)
 
 if start_epoch > 1:
     train_losses, test_losses = load_checkpoint(model, optimizer, checkpoints_dir, start_epoch)
@@ -84,4 +95,4 @@ else:
     train_losses, test_losses = [], []
 
 
-torch.save(model.state_dict(), 'models/fine_tuned_model/check{start_epoch}_model.pth'.format(start_epoch=start_epoch))
+torch.save(model.state_dict(), 'models/fine_tuned_model/check_highbatch{start_epoch}_model.pth'.format(start_epoch=start_epoch))
