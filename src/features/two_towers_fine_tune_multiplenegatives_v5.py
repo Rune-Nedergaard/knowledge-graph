@@ -17,8 +17,6 @@ from torch import Tensor
 from transformers import PreTrainedTokenizerFast
 import nltk
 import itertools
-from transformers.optimization import get_linear_schedule_with_warmup
-
 
 import spacy
 from spacy.cli import download as spacy_download
@@ -33,7 +31,7 @@ def spacy_sent_tokenize(text):
 
 
 # Create a directory to save checkpoints
-checkpoints_dir = 'models/two_tower_checkpoints_multiplenegatives_v3'
+checkpoints_dir = 'models/two_tower_checkpoints_multiplenegatives_v5'
 if not os.path.exists(checkpoints_dir):
     os.makedirs(checkpoints_dir)
 
@@ -247,7 +245,7 @@ two_tower_model = TwoTowerSimilarityModel(danish_bert_question, danish_bert_para
 custom_multiple_negatives_ranking_loss = CustomMultipleNegativesRankingLoss(two_tower_model)
 
 # Define optimizer and learning rate scheduler
-optimizer = AdamW(two_tower_model.parameters(), lr=7e-6, weight_decay=0.005)
+optimizer = AdamW(two_tower_model.parameters(), lr=1e-5, weight_decay=0.005)
 print(f"Using optimizer with the following parameters:")
 print(optimizer.defaults)
 scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=1, verbose=True)
@@ -258,12 +256,13 @@ val_size = len(dataset) - train_size
 train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
 # Create data loaders for training and validation sets
-train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=collate_fn, num_workers=16)
-val_dataloader = DataLoader(val_dataset, batch_size=16, shuffle=False, collate_fn=collate_fn, num_workers=16)
+train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=collate_fn, num_workers=16)
+val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn, num_workers=16)
 
 
 # Define number of epochs
 num_epochs = 10
+
 best_val_loss = float("inf")
 train_losses = []
 val_losses = []
@@ -280,29 +279,47 @@ scheduler = get_linear_schedule_with_warmup(
 )
 
 # Training loop
+num_steps_to_save = len(train_dataloader) // 5  # Save every 20% of the training data
+step_counter = 0
+running_train_loss = 0
+
 for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs}")
 
     two_tower_model.train()
     epoch_train_loss = 0
     train_progress_bar = tqdm(train_dataloader, desc="Training")
-    for batch in train_progress_bar:
+    for batch_idx, batch in enumerate(train_progress_bar):
         optimizer.zero_grad()
         loss = custom_multiple_negatives_ranking_loss(batch, None)
         loss.backward()
         optimizer.step()
         epoch_train_loss += loss.item()
+        running_train_loss += loss.item()
         train_progress_bar.set_description(f"Training (loss: {loss.item():.4f})")
 
         # Update the scheduler on the first epoch after warmup
         if epoch == 0 and scheduler.get_last_lr()[0] != optimizer.defaults['lr']:
             scheduler.step()
 
+        # Increment the step counter and save the model and loss if necessary
+        step_counter += 1
+        if step_counter == num_steps_to_save:
+            step_counter = 0
+            save_path = os.path.join(checkpoints_dir, f"model_step_{batch_idx+1}_epoch_{epoch+1}.pt")
+            torch.save(two_tower_model, save_path)
+            print(f"Model saved at step {batch_idx+1} of epoch {epoch+1}")
+
+            # Save average loss since the last checkpoint
+            average_loss_since_last_checkpoint = running_train_loss / num_steps_to_save
+            with open(os.path.join(checkpoints_dir, f"average_loss_step_{batch_idx+1}_epoch_{epoch+1}.pkl"), "wb") as f:
+                pickle.dump(average_loss_since_last_checkpoint, f)
+            running_train_loss = 0
+
     epoch_train_loss /= len(train_dataloader)
     print(f"Train loss: {epoch_train_loss:.4f}")
     train_losses.append(epoch_train_loss)
 
-    
     # Validation loop
     two_tower_model.eval()
     epoch_val_loss = 0

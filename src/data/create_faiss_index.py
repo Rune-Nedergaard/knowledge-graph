@@ -38,7 +38,7 @@ def load_embeddings(file_path):
 
     return embedding_matrix, ids
 
-embedding_matrix, ids = load_embeddings('embeddings.h5')
+embedding_matrix, ids = load_embeddings('two_tower_embeddings.h5')
 
 # Set the parameters for the IVFFlat index
 dimension = 768  # Dimension of the BERT embeddings
@@ -61,8 +61,8 @@ int_ids = [id_mapping[original_id] for original_id in ids]
 index_ivfflat.add_with_ids(embedding_matrix, np.array(int_ids, dtype=np.int64))
 
 # Save the index to a file
-faiss.write_index(index_ivfflat, 'index_ivfflat.faiss')
+faiss.write_index(index_ivfflat, 'tt_index_ivfflat.faiss')
 
 #Save the mapping dictionary to a file
-with open('id_mapping_faiss.pickle', 'wb') as f:
+with open('tt_id_mapping_faiss.pickle', 'wb') as f:
     pickle.dump(id_mapping, f)

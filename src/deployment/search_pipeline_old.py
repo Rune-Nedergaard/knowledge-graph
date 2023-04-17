@@ -5,13 +5,9 @@ import openai
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.models.bert_embed import BertEmbed
 from api_secrets import API_KEY
-#from src.models.semantic_search_function import get_similar_paragraphs
-from src.models.semantic_search_two_towers import get_similar_paragraphs
+from src.models.semantic_search_function import get_similar_paragraphs
 from src.models.bert_rerank import BertRerank
 from src.models.reranker_function import rerank_paragraphs
-import numpy as np
-from src.features.two_towers_fine_tune_multiplenegatives import *
-#from src.features.two_towers_fine_tune_multiplenegatives import TwoTowerSimilarityModel
 
 openai.api_key = API_KEY
 
@@ -56,8 +52,7 @@ def main(question):
 
     print(f"Spørgsmål: {question}\n")
     print(f"Svar: {answer}\n")
-    print(f"Top 10 reranked afsnit:\n")
-    print(20*"-")
+
 # Print the top 10 reranked paragraphs
     for idx, (paragraph, score) in enumerate(reranked_paragraphs[:10]):
         print(f"Paragraph {idx + 1}: {paragraph}\nRelevance Score: {score}\n")

@@ -12,64 +12,58 @@ from sklearn.metrics.pairwise import cosine_similarity
 import sys
 import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-#import the semantic search function
-from src.features.two_towers_fine_tune_seed_optimization import BertCustomBase, TwoTowerSimilarityModel, TwoTowerModel
-import torch
+from src.features.two_towers_fine_tune_multiplenegatives import TwoTowerSimilarityModel, BertCustomBase
 import faiss
-import pickle
-import numpy as np
-
-# Load the pre-trained and fine-tuned model
-save_directory = 'models/fine_tuned_model_two_tower'
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Initialize the Danish BERT question model (BertCustomBase)
-model_path = 'models/fine_tuned_model_two_tower/model.pt'
-two_tower_similarity_model = torch.load(model_path)
+def get_similar_paragraphs(user_question, k=100):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    pretrained_danish_bert = BertCustomBase(device)
 
-pretrained_danish_bert = BertCustomBase(device)
+    # Load the Faiss index and the mapping dictionary
+    index_ivfflat = faiss.read_index('tt_index_ivfflat.faiss')
+    with open('tt_id_mapping_faiss.pickle', 'rb') as f:
+        id_mapping = pickle.load(f)
 
-tokenizer = pretrained_danish_bert.tokenizer #not sure it is needed
+    id_mapping = {value: key for key, value in id_mapping.items()}
 
+    similar_paragraphs = []
+    # Load the TwoTowerSimilarityModel
+    model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_step_84390_epoch_1.pt'
+    model = torch.load(model_path, map_location=device)
 
-def embed_question(model, question, tokenizer, device):
-    inputs = tokenizer.encode_plus(question, return_tensors='pt', max_length=512, truncation=True, padding='max_length')
-    input_ids = inputs['input_ids'].to(device)
-    attention_mask = inputs['attention_mask'].to(device)
     with torch.no_grad():
-        question_embedding = model.two_tower_model.forward_question(input_ids, attention_mask)
-    return question_embedding.cpu().numpy()
+        question_embedding = model.question_model.embed_text(user_question).cpu().numpy()
+        question_embedding = question_embedding.reshape(1, -1)
+
+    # Search the nearest paragraphs using the Faiss index
+    distances, indices = index_ivfflat.search(question_embedding, k)
+
+    # Retrieve the paragraphs
+    for index in indices[0]:
+        if index in id_mapping:
+            original_id = id_mapping[index]
+            basename = original_id.split('.txt_')[0] + '.txt'
+            paragraph_index = int(original_id.split('.txt_')[1])
+
+            with open(os.path.join('data/all_paragraphs/paragraphs', basename), 'r', encoding='utf-8') as f:
+                paragraphs = f.read().split('\n')
+                similar_paragraphs.append(paragraphs[paragraph_index])
+
+    return similar_paragraphs
+
+
+if __name__ == '__main__':
 
 
 
-# Load the Faiss index and the mapping dictionary
-index_ivfflat = faiss.read_index('index_ivfflat.faiss')
-with open('id_mapping_faiss.pickle', 'rb') as f:
-    id_mapping = pickle.load(f)
+    user_question = input("Please enter your question: ")
 
-# Load the TwoTowerSimilarityModel
-two_tower_model_path = 'models/fine_tuned_model_two_tower/model.pt'
-model = torch.load(two_tower_model_path)
+    # Get the list of similar paragraphs
+    similar_paragraphs = get_similar_paragraphs(user_question)
 
-# Set the device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# Take user input question
-user_question = input("Please enter your question: ")
-
-# Embed the user question
-question_embedding = embed_question(model, user_question, tokenizer, device)
-
-# Search the 100 nearest paragraphs using the Faiss index
-k = 100
-distances, indices = index_ivfflat.search(question_embedding, k)
-
-# Display the results
-for i, index in enumerate(indices[0]):
-    original_id = id_mapping[index]
-    print(f"Result {i + 1}:")
-    print(f"Original ID: {original_id}")
-    print(f"Distance: {distances[0][i]}\n")
-
-
+    # Print the similar paragraphs
+    for i, paragraph in enumerate(similar_paragraphs):
+        print(f"Result {i + 1}:")
+        print(paragraph)
+        print("\n")

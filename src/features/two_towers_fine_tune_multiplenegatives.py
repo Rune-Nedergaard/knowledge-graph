@@ -19,8 +19,8 @@ import nltk
 import itertools
 
 import spacy
-from spacy.cli import download as spacy_download
-spacy_download('da_core_news_sm')
+#from spacy.cli import download as spacy_download
+#spacy_download('da_core_news_sm') ###needed when running on hpc
 
 
 nlp = spacy.load("da_core_news_sm", disable=["tagger", "parser", "ner", "lemmatizer", "attribute_ruler"])
@@ -135,6 +135,10 @@ class QuestionParagraphDataset(Dataset):
     
 
 def collate_fn(batch):
+    """
+    Organizing the way data is batched together and fed into the model
+    """
+
     question_batch = []
     positive_paragraph_batch = []
     negative_paragraph_batch = []
@@ -239,92 +243,93 @@ class CustomMultipleNegativesRankingLoss(nn.Module):
         labels = torch.zeros(scores.size(0), dtype=torch.long, device=scores.device)  # Example a[i] should match with b[i]
         return self.cross_entropy_loss(scores, labels)
 
+if __name__ == "__main__":
 
 
-two_tower_model = TwoTowerSimilarityModel(danish_bert_question, danish_bert_paragraph)
-custom_multiple_negatives_ranking_loss = CustomMultipleNegativesRankingLoss(two_tower_model)
+    two_tower_model = TwoTowerSimilarityModel(danish_bert_question, danish_bert_paragraph)
+    custom_multiple_negatives_ranking_loss = CustomMultipleNegativesRankingLoss(two_tower_model)
 
-# Define optimizer and learning rate scheduler
-optimizer = AdamW(two_tower_model.parameters(), lr=2e-5, weight_decay=0.005)
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=1, verbose=True)
+    # Define optimizer and learning rate scheduler
+    optimizer = AdamW(two_tower_model.parameters(), lr=2e-5, weight_decay=0.005)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=1, verbose=True)
 
-# Split the dataset into training and validation sets
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    # Split the dataset into training and validation sets
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-# Create data loaders for training and validation sets
-train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn, num_workers=16)
-val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=False, collate_fn=collate_fn, num_workers=16)
+    # Create data loaders for training and validation sets
+    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, collate_fn=collate_fn, num_workers=16)
+    val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=False, collate_fn=collate_fn, num_workers=16)
 
 
-# Define number of epochs
-num_epochs = 10
-best_val_loss = float("inf")
-train_losses = []
-val_losses = []
+    # Define number of epochs
+    num_epochs = 10
+    best_val_loss = float("inf")
+    train_losses = []
+    val_losses = []
 
-from transformers import get_linear_schedule_with_warmup
+    from transformers import get_linear_schedule_with_warmup
 
-# Define the number of training steps and warmup steps for the scheduler
-num_training_steps = len(train_dataloader) * num_epochs
-num_warmup_steps = int(num_training_steps * 0.1)  # 10% of total training steps for the first epoch
+    # Define the number of training steps and warmup steps for the scheduler
+    num_training_steps = len(train_dataloader) * num_epochs
+    num_warmup_steps = int(num_training_steps * 0.1)  # 10% of total training steps for the first epoch
 
-# Create the scheduler
-scheduler = get_linear_schedule_with_warmup(
-    optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps
-)
+    # Create the scheduler
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps
+    )
 
-# Training loop
-for epoch in range(num_epochs):
-    print(f"Epoch {epoch+1}/{num_epochs}")
+    # Training loop
+    for epoch in range(num_epochs):
+        print(f"Epoch {epoch+1}/{num_epochs}")
 
-    two_tower_model.train()
-    epoch_train_loss = 0
-    train_progress_bar = tqdm(train_dataloader, desc="Training")
-    for batch in train_progress_bar:
-        optimizer.zero_grad()
-        loss = custom_multiple_negatives_ranking_loss(batch, None)
-        loss.backward()
-        optimizer.step()
-        epoch_train_loss += loss.item()
-        train_progress_bar.set_description(f"Training (loss: {loss.item():.4f})")
-
-        # Update the scheduler on the first epoch after warmup
-        if epoch == 0 and scheduler.get_last_lr()[0] != optimizer.defaults['lr']:
-            scheduler.step()
-
-    epoch_train_loss /= len(train_dataloader)
-    print(f"Train loss: {epoch_train_loss:.4f}")
-    train_losses.append(epoch_train_loss)
-
-    # Validation loop
-    two_tower_model.eval()
-    epoch_val_loss = 0
-    val_progress_bar = tqdm(val_dataloader, desc="Validation")
-    with torch.no_grad():
-        for batch in val_progress_bar:
+        two_tower_model.train()
+        epoch_train_loss = 0
+        train_progress_bar = tqdm(train_dataloader, desc="Training")
+        for batch in train_progress_bar:
+            optimizer.zero_grad()
             loss = custom_multiple_negatives_ranking_loss(batch, None)
-            epoch_val_loss += loss.item()
-            val_progress_bar.set_description(f"Validation (loss: {loss.item():.4f})")
+            loss.backward()
+            optimizer.step()
+            epoch_train_loss += loss.item()
+            train_progress_bar.set_description(f"Training (loss: {loss.item():.4f})")
 
-    epoch_val_loss /= len(val_dataloader)
-    print(f"Validation loss: {epoch_val_loss:.4f}")
-    val_losses.append(epoch_val_loss)
+            # Update the scheduler on the first epoch after warmup
+            if epoch == 0 and scheduler.get_last_lr()[0] != optimizer.defaults['lr']:
+                scheduler.step()
 
-    # Update the learning rate scheduler based on validation loss
-    scheduler.step(epoch_val_loss)
+        epoch_train_loss /= len(train_dataloader)
+        print(f"Train loss: {epoch_train_loss:.4f}")
+        train_losses.append(epoch_train_loss)
 
-    # Save the model (not just the state_dict) whenever the validation loss is better than the last epoch
-    if epoch_val_loss < best_val_loss:
-        best_val_loss = epoch_val_loss
-        best_model_path = os.path.join(checkpoints_dir, f"best_model_epoch_{epoch+1}.pt")
-        torch.save(two_tower_model, best_model_path)
-        print(f"Best model saved at epoch {epoch+1} with validation loss: {best_val_loss:.4f}")
+        # Validation loop
+        two_tower_model.eval()
+        epoch_val_loss = 0
+        val_progress_bar = tqdm(val_dataloader, desc="Validation")
+        with torch.no_grad():
+            for batch in val_progress_bar:
+                loss = custom_multiple_negatives_ranking_loss(batch, None)
+                epoch_val_loss += loss.item()
+                val_progress_bar.set_description(f"Validation (loss: {loss.item():.4f})")
 
-    # Save train and validation losses as pickles every epoch
-    with open(os.path.join(checkpoints_dir, f"train_losses_epoch_{epoch+1}.pkl"), "wb") as f:
-        pickle.dump(train_losses, f)
+        epoch_val_loss /= len(val_dataloader)
+        print(f"Validation loss: {epoch_val_loss:.4f}")
+        val_losses.append(epoch_val_loss)
 
-    with open(os.path.join(checkpoints_dir, f"val_losses_epoch_{epoch+1}.pkl"), "wb") as f:
-        pickle.dump(val_losses, f)
+        # Update the learning rate scheduler based on validation loss
+        scheduler.step(epoch_val_loss)
+
+        # Save the model (not just the state_dict) whenever the validation loss is better than the last epoch
+        if epoch_val_loss < best_val_loss:
+            best_val_loss = epoch_val_loss
+            best_model_path = os.path.join(checkpoints_dir, f"best_model_epoch_{epoch+1}.pt")
+            torch.save(two_tower_model, best_model_path)
+            print(f"Best model saved at epoch {epoch+1} with validation loss: {best_val_loss:.4f}")
+
+        # Save train and validation losses as pickles every epoch
+        with open(os.path.join(checkpoints_dir, f"train_losses_epoch_{epoch+1}.pkl"), "wb") as f:
+            pickle.dump(train_losses, f)
+
+        with open(os.path.join(checkpoints_dir, f"val_losses_epoch_{epoch+1}.pkl"), "wb") as f:
+            pickle.dump(val_losses, f)
