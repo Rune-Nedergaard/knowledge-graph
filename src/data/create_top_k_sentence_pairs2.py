@@ -45,15 +45,22 @@ def load_required_embeddings(embeddings_folder, paragraph_ids):
             file = f"{paragraph_id}.txt_{index}.npy"
             file_path = os.path.join(embeddings_folder, file)
             if os.path.isfile(file_path):
-                embedding = torch.from_numpy(np.load(file_path))
+                embedding = torch.tensor(torch.load(file_path))  # Load the embedding using torch.load
                 if paragraph_id not in embeddings:
                     embeddings[paragraph_id] = []
-                embeddings[paragraph_id].append((index, embedding))
+                embeddings[paragraph_id].append((index, embedding))  # Append the index and the embedding tensor
                 print(f"Loaded embedding: {file_path}")  # Print the loaded embedding file path
                 index += 1
             else:
                 break
     return embeddings
+
+
+
+
+
+
+
 
 
 
@@ -78,7 +85,7 @@ for _, ids in list(question_to_fil.items())[:100]:
 
 embeddings = load_required_embeddings(embeddings_folder, paragraph_ids)
 
-k = 3
+k = 2
 question_paragraph_pairs_top_k = []
 
 for question_id, paragraph_ids in tqdm(list(question_to_fil.items())[:100], desc="Processing questions"):
@@ -102,11 +109,11 @@ for question_id, paragraph_ids in tqdm(list(question_to_fil.items())[:100], desc
 
     for paragraph_id in paragraph_ids:
         if paragraph_id in embeddings:
-            paragraph_embedding = embeddings[paragraph_id]
-            paragraph_embeddings.append(paragraph_embedding)
-        else:
-            print(f"Embedding not found for paragraph ID: {paragraph_id}")
-    
+            for embed in embeddings[paragraph_id]:
+                paragraph_embeddings.append(embed)
+    else:
+        print(f"Embedding not found for paragraph ID: {paragraph_id}")
+
     if len(paragraph_embeddings) < k:
         print(f"Skipping question {question_id} as it has less than {k} embeddings.")
         continue
@@ -114,7 +121,7 @@ for question_id, paragraph_ids in tqdm(list(question_to_fil.items())[:100], desc
 
 
     # Calculate cosine similarity and get top-k indices
-    paragraph_embedding_tensors = [embed for embed in paragraph_embeddings if embed is not None]
+    paragraph_embedding_tensors = [embed[1].to(device) for embed in paragraph_embeddings if embed is not None]  # Extract only the embeddings and move them to the device
     
     
     if not paragraph_embedding_tensors:  # Move this check here

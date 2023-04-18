@@ -100,7 +100,7 @@ file_dir = 'data/paragraphs' ##### CHANGE THIS TO THE CORRECT FOLDER DOING THE F
 dataset = ParagraphDataset(file_dir)
 data_loader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn, num_workers=16, shuffle=True)
 
-embeddings_folder = 'data/embeddings_tt'
+embeddings_folder = 'data/embeddings'
 embed_and_save(model, data_loader, device, embeddings_folder)
 embeddings = load_embeddings_from_folder(embeddings_folder)
 
