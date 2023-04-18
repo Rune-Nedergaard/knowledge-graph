@@ -37,7 +37,7 @@ root_dir = 'models'
 # Find all relevant subfolders
 #checkpoints_dirs = find_subfolders_with_prefix(root_dir, "two_tower_checkpoints_multiplenegatives")
 
-checkpoints_dirs = ['models/two_tower_checkpoints_multiplenegatives_v4']
+checkpoints_dirs = ['models/v2-batch128-1e5']
 
 def latest_checkpoint(checkpoints_dir):
     # Find all checkpoint files

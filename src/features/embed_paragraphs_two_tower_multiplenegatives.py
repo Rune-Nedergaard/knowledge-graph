@@ -96,7 +96,7 @@ two_tower_model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_
 
 model = torch.load(two_tower_model_path)
 
-file_dir = 'data/subset_paragraphs_filtered_half' ##### CHANGE THIS TO THE CORRECT FOLDER DOING THE FINAL RUN ########
+file_dir = 'data/subset_paragraphs_filtered' ##### CHANGE THIS TO THE CORRECT FOLDER DOING THE FINAL RUN ########
 dataset = ParagraphDataset(file_dir)
 data_loader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn, num_workers=0, shuffle=True)
 
