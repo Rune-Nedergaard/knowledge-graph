@@ -16,6 +16,7 @@ import hashlib
 
 
 
+
 def get_similar_paragraphs(query, k=4, max_tokens=500, before_percent=0.3, approximate=True, embedding_matrix=None, ids=None):#last three are for exact search
     # Load the fine-tuned BERT model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

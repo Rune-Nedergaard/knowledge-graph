@@ -92,7 +92,8 @@ def load_embeddings_from_folder(embeddings_folder):
 
     return embeddings
 
-two_tower_model_path = 'models/two_tower_checkpoints_multiplenegatives_v7/model_step_337560_epoch_1.pt'
+two_tower_model_path = 'models/two_tower_checkpoints_multiplenegatives_v17/best_model_epoch_1.pt'
+
 
 model = torch.load(two_tower_model_path)
 
@@ -100,12 +101,12 @@ file_dir = 'data/paragraphs' ##### CHANGE THIS TO THE CORRECT FOLDER DOING THE F
 dataset = ParagraphDataset(file_dir)
 data_loader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn, num_workers=16, shuffle=True)
 
-embeddings_folder = 'data/embeddings'
+embeddings_folder = 'data/embeddings_final'
 embed_and_save(model, data_loader, device, embeddings_folder)
 embeddings = load_embeddings_from_folder(embeddings_folder)
 
 try:
-    with h5py.File('two_tower_embeddings.h5', 'w') as f:
+    with h5py.File('final_two_tower_embeddings.h5', 'w') as f:
         for filename, file_embeddings in embeddings.items():
             group = f.create_group(filename)
             for index, embedding in file_embeddings:
@@ -115,7 +116,7 @@ except Exception as e:
     print("Failed to save embeddings with h5py. Error:", e)
 
     try:
-        with open('two_tower.pickle', 'wb') as f:
+        with open('final_two_tower.pickle', 'wb') as f:
             pickle.dump(embeddings, f)
         print("Embeddings saved to embeddings.pickle")
     except Exception as e:

@@ -45,10 +45,10 @@ def main(question):
     reranker = BertRerank(model_path=fine_tuned_model_path)
 
     # Perform semantic search to get the top 1000 paragraphs
-    top_k_paragraphs = get_similar_paragraphs(question, k=100)
+    top_k_paragraphs, indicies = get_similar_paragraphs(question, k=100)
 
     # Rerank the paragraphs using the rerank_paragraphs function
-    reranked_paragraphs = rerank_paragraphs(question, top_k_paragraphs, reranker)
+    reranked_paragraphs = rerank_paragraphs(question, top_k_paragraphs, indicies, reranker)
     """PROBABLY GET CONTEXT FOR THE PARAGRAPHS HERE"""
 
     final_paragraphs = [paragraph for paragraph, score in reranked_paragraphs[:8]]
@@ -63,10 +63,12 @@ def main(question):
         print(f"Paragraph {idx + 1}: {paragraph}\nRelevance Score: {score}\n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rerank top 1000 paragraphs for a given question.")
-    parser.add_argument("question", type=str, help="Input question for semantic search and reranking")
-    args = parser.parse_args()
+    """UNCOMMENT THIS TO RUN THE SCRIPT FROM THE COMMAND LINE"""
+    #parser = argparse.ArgumentParser(description="Rerank top 1000 paragraphs for a given question.")
+    #parser.add_argument("question", type=str, help="Input question for semantic search and reranking")
+    #args = parser.parse_args()
+    #main(args.question)
 
-    main(args.question)
+    main("Gør vi nok for at støtte udsatte unge?")
 
 

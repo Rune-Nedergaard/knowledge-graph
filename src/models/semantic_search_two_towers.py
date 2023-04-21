@@ -50,7 +50,7 @@ def get_similar_paragraphs(user_question, k=100):
                 paragraphs = f.read().split('\n')
                 similar_paragraphs.append(paragraphs[paragraph_index])
 
-    return similar_paragraphs
+    return similar_paragraphs, indices
 
 
 if __name__ == '__main__':

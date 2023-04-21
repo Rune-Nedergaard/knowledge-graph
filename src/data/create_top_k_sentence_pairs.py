@@ -19,7 +19,6 @@ print('Using device:', device)
 embeddings_folder = 'data/embeddings'   
 data_folder = 'data'
 
-
 def cos_sim(a: Tensor, b: Tensor):
     if not isinstance(a, torch.Tensor):
         a = torch.tensor(a)
@@ -37,20 +36,36 @@ def cos_sim(a: Tensor, b: Tensor):
     b_norm = torch.nn.functional.normalize(b, p=2, dim=1)
     return torch.mm(a_norm, b_norm.transpose(0, 1))
 
-
-def load_embeddings_from_folder(embeddings_folder):
+def load_required_embeddings(embeddings_folder, paragraph_ids):
     embeddings = {}
-    for file in tqdm(os.listdir(embeddings_folder), desc="Loading embeddings"):
-        if file.endswith(".npy"):
-            filename, index = file[:-4].rsplit('_', 1)
-            index = int(index)
-            if filename not in embeddings:
-                embeddings[filename] = []
-            embeddings[filename].append((index, torch.from_numpy(torch.load(os.path.join(embeddings_folder, file)))))
+    for paragraph_id in tqdm(paragraph_ids, desc="Loading embeddings"):
+        index = 0
+        while True:
+            file = f"{paragraph_id}.txt_{index}.npy"
+            file_path = os.path.join(embeddings_folder, file)
+            if os.path.isfile(file_path):
+                embedding = torch.tensor(torch.load(file_path))  # Load the embedding using torch.load
+                if paragraph_id not in embeddings:
+                    embeddings[paragraph_id] = []
 
-    for filename in embeddings.keys():
-        embeddings[filename].sort(key=lambda x: x[0])
-
+                # Load the paragraph text
+                paragraph_file = os.path.join(data_folder, "paragraphs", f"{paragraph_id}.txt")
+                try:
+                    with open(paragraph_file, "r", encoding="utf-8") as p_file:
+                        all_paragraphs = p_file.read().strip().split('\n')
+                        if index < len(all_paragraphs):  # Update the condition
+                            paragraph_text = all_paragraphs[index]
+                        else:
+                            print(f"Index out of range for paragraph ID: {paragraph_id}, index: {index}")
+                            break
+                except:
+                    #print(f"Unable to load paragraph file: {paragraph_file}")
+                    pass
+                embeddings[paragraph_id].append((index, embedding, paragraph_text))  # Append the index, the embedding tensor, and the paragraph text
+                #print(f"Loaded embedding: {file_path}")  # Print the loaded embedding file path
+                index += 1
+            else:
+                break
     return embeddings
 
 # Load the TwoTowerSimilarity model
@@ -60,17 +75,27 @@ model = torch.load(two_tower_model_path)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
-# Load embeddings
-embeddings = load_embeddings_from_folder(embeddings_folder)
-
 # Load question_to_fil
-with open('data/raw/question_to_fil_filtered.pkl', 'rb') as f:
+with open('data/raw/question_to_fil.pkl', 'rb') as f:
     question_to_fil = pickle.load(f)
 
-k = 3
-question_paragraph_pairs_top_k = []
+# Load only the required embeddings for the first 100 questions
+paragraph_ids = set()
+for _, ids in list(question_to_fil.items()):
+    if isinstance(ids, (list, tuple)):
+        paragraph_ids.update(ids)
+    else:
+        paragraph_ids.add(ids)
 
-for question_id, paragraph_ids in tqdm(question_to_fil.items(), desc="Processing questions"):
+embeddings = load_required_embeddings(embeddings_folder, paragraph_ids)
+
+k = 4
+question_paragraph_pairs_top_k = []
+num_top_k_paragraphs = []
+
+for question_id, paragraph_ids in tqdm(list(question_to_fil.items()), desc="Processing questions"):
+    if not isinstance(paragraph_ids, (list, tuple)):  # Ensure paragraph_ids is a list or tuple
+        paragraph_ids = [paragraph_ids]
     question_file = os.path.join(data_folder, "questions_rephrased", f"{question_id}.txt")
 
     if not os.path.isfile(question_file):
@@ -80,38 +105,62 @@ for question_id, paragraph_ids in tqdm(question_to_fil.items(), desc="Processing
     with open(question_file, "r", encoding='iso-8859-1') as q_file:
         question = q_file.read().strip()
 
-    if not isinstance(paragraph_ids, (list, tuple)):  # Ensure paragraph_ids is a list or tuple
-        paragraph_ids = [paragraph_ids]
-
-    if len(paragraph_ids) < k:
-        print(f"Skipping question {question_id} as it has less than {k} paragraphs.")
-        continue
-
     question_embedding = model.question_model.embed_text(question)
     paragraph_embeddings = []
 
     for paragraph_id in paragraph_ids:
         if paragraph_id in embeddings:
-            for embedding_tuple in embeddings[paragraph_id]:
-                paragraph_embedding = embedding_tuple[1]
-                paragraph_embeddings.append(paragraph_embedding)
+            for embed in embeddings[paragraph_id]:
+                paragraph_embeddings.append(embed)
         else:
             print(f"Embedding not found for paragraph ID: {paragraph_id}")
+
+    num_paragraphs = len(paragraph_embeddings)
+
+    if num_paragraphs < 3:
+        num_top_k_paragraphs.append(0)
+        continue
+    actual_k = min(k, num_paragraphs - 1)
 
 
 
     # Calculate cosine similarity and get top-k indices
-    paragraph_embedding_tensors = [embed for embed, _ in paragraph_embeddings]
+    paragraph_embedding_tensors = [embed[1].to(device) for embed in paragraph_embeddings if embed is not None]  # Extract only the embeddings and move them to the device
+
+    if not paragraph_embedding_tensors:
+        #print(f"Skipping question {question_id} as no paragraph embeddings were found.")
+        num_top_k_paragraphs.append(0)
+        continue
+
+    # Calculate cosine similarity and get top-k indices
     similarities = cos_sim(question_embedding, torch.stack(paragraph_embedding_tensors))
-    _, top_k_indices = torch.topk(similarities, k)
+    
+    # Calculate the actual k value, considering the maximum limit of N-1 paragraphs
+    _, top_k_indices = torch.topk(similarities, actual_k)
 
     # Get the top-k paragraphs
-    top_k_paragraphs = [paragraph_embeddings[i][1] for i in top_k_indices.squeeze()]
+    top_k_paragraphs = [paragraph_embeddings[i][2] for i in top_k_indices.squeeze()]
 
     # Create question-paragraph pairs
     for top_k_paragraph in top_k_paragraphs:
         question_paragraph_pairs_top_k.append((question, top_k_paragraph))
 
-# Save the question_paragraph_pairs_top_k list as a pickle
-with open(os.path.join(data_folder, 'question_paragraph_pairs_top_k.pkl'), 'wb') as f:
+    num_top_k_paragraphs.append(len(top_k_paragraphs))
+
+with open(os.path.join(data_folder, 'filtered_v3_question_chunk_pairs.pkl'), 'wb') as f:
     pickle.dump(question_paragraph_pairs_top_k, f)
+
+
+#for i, (question, paragraph) in enumerate(question_paragraph_pairs_top_k):
+    #print(f"{i+1}. {question} - {paragraph}")
+
+# Plot the distribution of the number of top-k paragraphs
+# 
+import matplotlib.pyplot as plt
+
+plt.hist(num_top_k_paragraphs, bins=range(0, k+2), align='left', rwidth=0.8)
+plt.xlabel('Number of top-k paragraphs')
+plt.ylabel('Frequency')
+plt.title('Distribution of the number of top-k paragraphs for each question')
+plt.xticks(range(0, k+1))
+plt.show()

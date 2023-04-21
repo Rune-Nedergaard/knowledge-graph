@@ -10,7 +10,7 @@ from transformers import AdamW
 from danlp.models import load_bert_base_model
 
 # Create a directory to save checkpoints
-checkpoints_dir = 'models/checkpoints'
+checkpoints_dir = 'models/checkpoints_fine_tune_bert_embed_hpc'
 if not os.path.exists(checkpoints_dir):
     os.makedirs(checkpoints_dir)
 
@@ -104,19 +104,15 @@ class SemanticSimilarityModel(nn.Module):
         self.bert_model = bert_model
         self.linear = nn.Linear(bert_model.config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
-
-        # He initialization
-        init.kaiming_normal_(self.linear.weight)
-
         # Xavier initialization
-        # init.xavier_normal_(self.linear.weight)
+        init.xavier_normal_(self.linear.weight)
 
     def forward(self, input_ids, attention_mask):
         outputs = self.bert_model(input_ids, attention_mask=attention_mask)
         pooled_output = outputs[1]  # Use the [CLS] token representation
         logits = self.linear(pooled_output)
         probabilities = self.sigmoid(logits)
-        return probabilities.squeeze()
+        return probabilities.squeeze() # Reshape from (batch_size, 1) to (batch_size,)
 
 
 # Use DataParallel if multiple GPUs are available
@@ -127,7 +123,7 @@ model = model.to(device)
 
 # Define the loss function and optimizer
 loss_function = nn.BCELoss()
-optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.001)
+optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.005)
 
 
 # Split your data into training, validation, and test sets
@@ -137,9 +133,9 @@ test_size = len(question_chunk_dataset) - train_size - val_size
 train_data, val_data, test_data = random_split(question_chunk_dataset, [train_size, val_size, test_size])
 
 # Create DataLoaders for the three sets
-train_loader = DataLoader(train_data, batch_size=8, shuffle=True)
-val_loader = DataLoader(val_data, batch_size=8, shuffle=False)
-test_loader = DataLoader(test_data, batch_size=8, shuffle=False)
+train_loader = DataLoader(train_data, batch_size=80, shuffle=True)
+val_loader = DataLoader(val_data, batch_size=80, shuffle=False)
+test_loader = DataLoader(test_data, batch_size=80, shuffle=False)
 
 def load_checkpoint(model, optimizer, checkpoints_dir, epoch):
     checkpoint_path = os.path.join(checkpoints_dir, f'checkpoint_epoch_{epoch}.pth')
@@ -260,7 +256,7 @@ for epoch in range(start_epoch - 1, num_epochs):  # Subtract 1 to make it zero-i
     if test_loss < best_test_loss:
         print(f"Improved test loss from {best_test_loss:.4f} to {test_loss:.4f}. Saving the model.")
         best_test_loss = test_loss
-        torch.save(model.state_dict(), 'models/fine_tuned_model.pth')
+        torch.save(model.state_dict(), 'models/reranker_model.pth')
 
 
 

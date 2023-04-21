@@ -16,7 +16,7 @@ import hashlib
 import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 #import the semantic search function
-from src.models.semantic_search_function import get_similar_paragraphs
+from src.models.not_in_use_search_function import get_similar_paragraphs
 
 
 #Load the rephrased questions by opening all the files in the rephrased_questions folder and create a dict that maps the file name to the question

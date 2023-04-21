@@ -5,7 +5,7 @@ import openai
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.models.bert_embed import BertEmbed
 from api_secrets import API_KEY
-from src.models.semantic_search_function import get_similar_paragraphs
+from src.models.not_in_use_search_function import get_similar_paragraphs
 from src.models.bert_rerank import BertRerank
 from src.models.reranker_function import rerank_paragraphs
 

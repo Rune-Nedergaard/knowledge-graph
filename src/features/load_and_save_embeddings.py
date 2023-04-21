@@ -6,14 +6,14 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 import pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.features.two_towers_fine_tune_multiplenegatives import *
+#from src.features.two_towers_fine_tune_multiplenegatives import *
 import torch.multiprocessing as mp
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
-danish_bert_question = BertCustomBase(device)
-tokenizer = danish_bert_question.tokenizer
+#danish_bert_question = BertCustomBase(device)
+#tokenizer = danish_bert_question.tokenizer
 
 
 def load_embeddings_from_folder(embeddings_folder):
@@ -39,16 +39,16 @@ def load_embeddings_from_folder(embeddings_folder):
     return embeddings
 
 
-two_tower_model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_step_84390_epoch_1.pt'
+#two_tower_model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_step_84390_epoch_1.pt'
 
-model = torch.load(two_tower_model_path)
+#model = torch.load(two_tower_model_path)
 
-embeddings_folder = 'data/embeddings'
+embeddings_folder = 'data/embeddings_final'
 
 embeddings = load_embeddings_from_folder(embeddings_folder)
 
 try:
-    with h5py.File('two_tower_embeddings.h5', 'w') as f:
+    with h5py.File('final_two_tower_embeddings.h5', 'w') as f:
         for filename, file_embeddings in embeddings.items():
             group = f.create_group(filename)
             for index, embedding in file_embeddings:

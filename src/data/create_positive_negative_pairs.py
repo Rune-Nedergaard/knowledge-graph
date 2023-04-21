@@ -2,7 +2,7 @@ import random
 import pickle
 from tqdm import tqdm
 
-question_chunk_pairs = pickle.load(open("data/question_chunk_pairs.pkl", "rb"))
+question_chunk_pairs = pickle.load(open("data/filtered_v3_question_chunk_pairs.pkl", "rb"))
 
 
 def create_positive_negative_pairs(question_chunk_pairs, num_negative_samples=1):

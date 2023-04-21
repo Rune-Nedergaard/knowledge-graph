@@ -38,7 +38,7 @@ def load_embeddings(file_path):
 
     return embedding_matrix, ids
 
-embedding_matrix, ids = load_embeddings('two_tower_embeddings.h5')
+embedding_matrix, ids = load_embeddings('final_two_tower_embeddings.h5')
 
 # Set the parameters for the IVFFlat index
 dimension = 768  # Dimension of the BERT embeddings

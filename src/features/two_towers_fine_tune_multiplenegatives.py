@@ -81,6 +81,12 @@ class BertCustomBase(DaNLPBertBase):
         sentence_embedding = self.embed_text(text)
         return sentence_embedding
 
+    """
+    Notice that this embed_paragraph method is not used during training.
+    Instead it is used during inference when embedding the corpus.
+    During training, the forward pass of the TwoTowerSimilarityModel implements the same functionality.
+    The reason for the redundant code is due to how the dataloader is set up when training.
+    """
     def embed_paragraph(self, text):
         # Split the paragraph into sentences
         sentences = spacy_sent_tokenize(text)
@@ -230,17 +236,19 @@ class CustomMultipleNegativesRankingLoss(nn.Module):
         positive_paragraphs = batch["positive_paragraph"]
         negative_paragraphs = batch["negative_paragraph"]
         
+        # Getting embeddings
         question_embeddings, positive_paragraph_embeddings = self.model(questions, positive_paragraphs)
         _, negative_paragraph_embeddings = self.model(questions, negative_paragraphs)
         
+        # Computing similarity scores
         positive_scores = self.similarity_fct(question_embeddings, positive_paragraph_embeddings) * self.scale
         negative_scores = self.similarity_fct(question_embeddings, negative_paragraph_embeddings) * self.scale
 
         # Concatenate positive and negative scores along the columns
         scores = torch.cat((positive_scores, negative_scores), dim=1)
 
-        
-        labels = torch.zeros(scores.size(0), dtype=torch.long, device=scores.device)  # Example a[i] should match with b[i]
+        # Create labels for the cross entropy loss, letting the model know the index of the positive sample
+        labels = torch.zeros(scores.size(0), dtype=torch.long, device=scores.device)  
         return self.cross_entropy_loss(scores, labels)
 
 if __name__ == "__main__":
