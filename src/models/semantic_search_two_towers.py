@@ -28,6 +28,8 @@ def get_similar_paragraphs(user_question, k=100):
     id_mapping = {value: key for key, value in id_mapping.items()}
 
     similar_paragraphs = []
+    similar_file_indices = []
+
     # Load the TwoTowerSimilarityModel
     model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_step_84390_epoch_1.pt'
     model = torch.load(model_path, map_location=device)
@@ -39,6 +41,7 @@ def get_similar_paragraphs(user_question, k=100):
     # Search the nearest paragraphs using the Faiss index
     distances, indices = index_ivfflat.search(question_embedding, k)
 
+
     # Retrieve the paragraphs
     for index in indices[0]:
         if index in id_mapping:
@@ -49,8 +52,9 @@ def get_similar_paragraphs(user_question, k=100):
             with open(os.path.join('data/all_paragraphs/paragraphs', basename), 'r', encoding='utf-8') as f:
                 paragraphs = f.read().split('\n')
                 similar_paragraphs.append(paragraphs[paragraph_index])
+                similar_file_indices.append((basename, paragraph_index))
 
-    return similar_paragraphs, indices
+    return similar_paragraphs, similar_file_indices
 
 
 if __name__ == '__main__':
@@ -60,7 +64,7 @@ if __name__ == '__main__':
     user_question = input("Please enter your question: ")
 
     # Get the list of similar paragraphs
-    similar_paragraphs = get_similar_paragraphs(user_question)
+    similar_paragraphs, similar_file_indices = get_similar_paragraphs(user_question)
 
     # Print the similar paragraphs
     for i, paragraph in enumerate(similar_paragraphs):

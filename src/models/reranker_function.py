@@ -10,20 +10,30 @@ from danlp.models import load_bert_base_model
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.models.bert_rerank import BertRerank
-
+import faiss
 danish_bert = load_bert_base_model()
 tokenizer = danish_bert.tokenizer
 
 # Load the fine-tuned re-ranker model
-fine_tuned_model_path = 'models/fine_tuned_model/check7_model.pth'
+#fine_tuned_model_path = 'models/fine_tuned_model/check_highbatch2_model.pth'
 
-reranker = BertRerank(model_path=fine_tuned_model_path)
+#reranker = BertRerank(model_path=fine_tuned_model_path)
+index_ivfflat = faiss.read_index('tt_index_ivfflat.faiss')
+with open('tt_id_mapping_faiss.pickle', 'rb') as f:
+    id_mapping = pickle.load(f)
+#id_mapping = {value: key for key, value in id_mapping.items()}
 
-
-
-def get_context_paragraphs(paragraphs, index, max_tokens=450, before_percent=0.3):
+def get_context_paragraphs(filename, index, max_tokens=350, before_percent=0.3):
     # Convert paragraphs to raw text and print first 500 characters
-    
+    with open(os.path.join('data/all_paragraphs/paragraphs', filename), 'r', encoding='utf-8') as f:
+        paragraphs = f.read().split('\n')
+
+    if index >= len(paragraphs):
+        print("Failed to get context paragraphs for index", index, "in file", filename)
+        print("Returning empty string")
+        return ''
+        #raise ValueError(f'Index {index} is out of bounds for {filename}')
+
     current_paragraph = paragraphs[index]
     current_length = len(current_paragraph.split())
     remaining_tokens = max_tokens - current_length
@@ -69,22 +79,33 @@ def get_context_paragraphs(paragraphs, index, max_tokens=450, before_percent=0.3
     return output
 
 
+"""
+def get_filename_from_index(index_tuple):
+    combined_index = '_'.join([str(i) for i in index_tuple])
+    original_id = id_mapping[combined_index]
+    return original_id
+    #return original_id.split('_')[0] + '.txt'
+"""
 
-def rerank_paragraphs(question, indices, top_k_paragraphs, reranker):
-    # Rerank the paragraphs based on their relevance to the question
+
+
+def rerank_paragraphs(question, file_indices, top_k_paragraphs, reranker):
     paragraph_scores = []
-    
-    for index, paragraph in tqdm(zip(indices, top_k_paragraphs), desc="Reranking paragraphs"):
-        similarity = reranker.predict_similarity(question, paragraph)
-        paragraph_scores.append((index, paragraph, similarity))
 
-    # Sort the paragraphs based on their relevance scores
-    reranked_paragraphs = sorted(paragraph_scores, key=lambda x: x[2], reverse=True)
-    
-    #top 10 paragraphs
+    for file_tuple, index, paragraph in tqdm(zip(file_indices, range(len(top_k_paragraphs)), top_k_paragraphs), desc="Reranking paragraphs"):
+        filename = file_tuple[0]
+        paragrah_index = file_tuple[1]
+        #if index != file_tuple[1]:
+        #    print("Index mismatch")
+        #filename is the stuff before .txt
+        #filename = txtname.split('.')[0]
+
+
+        similarity = reranker.predict_similarity(question, paragraph)
+        paragraph_scores.append((paragrah_index, filename, paragraph, similarity))
+
+    reranked_paragraphs = sorted(paragraph_scores, key=lambda x: x[3], reverse=True)
     reranked_paragraphs = reranked_paragraphs[:10]
-    
-    #using the get context paragraphs function to get the context paragraphs for the top 10 paragraphs
-    reranked_paragraphs = [get_context_paragraphs(paragraphs, index) for index, paragraphs, similarity in reranked_paragraphs]
-    
+    reranked_paragraphs = [(get_context_paragraphs(filename, paragraph_index), score, filename, paragraph_index) for paragraph_index, filename, _, score in reranked_paragraphs]
+
     return reranked_paragraphs
