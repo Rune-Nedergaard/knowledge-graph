@@ -23,7 +23,7 @@ with open('tt_id_mapping_faiss.pickle', 'rb') as f:
     id_mapping = pickle.load(f)
 #id_mapping = {value: key for key, value in id_mapping.items()}
 
-def get_context_paragraphs(filename, index, max_tokens=350, before_percent=0.3):
+def get_context_paragraphs(filename, index, max_tokens=300, before_percent=0.3):
     # Convert paragraphs to raw text and print first 500 characters
     with open(os.path.join('data/all_paragraphs/paragraphs', filename), 'r', encoding='utf-8') as f:
         paragraphs = f.read().split('\n')

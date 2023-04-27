@@ -93,3 +93,5 @@ src/deployment/api_secrets.py
 *.faiss
 *.h5
 *.pt
+src/deployment/api_secrets copy.py
+src/deployment/dtu_api.py

@@ -31,7 +31,7 @@ def get_similar_paragraphs(user_question, k=100):
     similar_file_indices = []
 
     # Load the TwoTowerSimilarityModel
-    model_path = 'models/two_tower_checkpoints_multiplenegatives_v4/model_step_84390_epoch_1.pt'
+    model_path = 'models/two_tower_checkpoints_multiplenegatives_v17/best_model_epoch_1.pt'
     model = torch.load(model_path, map_location=device)
 
     with torch.no_grad():
