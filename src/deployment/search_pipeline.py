@@ -9,6 +9,7 @@ logging.getLogger().setLevel(logging.ERROR)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 #from src.models.bert_embed import BertEmbed
 from api_secrets import API_KEY
+#from dtu_api import API_KEY
 #from src.models.semantic_search_function import get_similar_paragraphs
 from src.models.semantic_search_two_towers import get_similar_paragraphs
 from src.models.bert_rerank import BertRerank

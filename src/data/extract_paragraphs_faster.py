@@ -13,31 +13,22 @@ import torch
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-#from src.models.bert_embed import BertEmbed
-
-
-#ids = [int(file.split('\\')[-1].split('.')[0]) for file in glob.glob('data/questions_rephrased/*.txt')]
-#Random_subset = pd.read_pickle('data/raw/random_subset.pkl')
-#Dokument = pd.read_pickle('data/raw/Dokument.pkl')
-#Sag = pd.read_pickle('data/raw/Sag.pkl')
-#Fil = pd.read_pickle('data/raw/Fil.pkl')
 Filtered_fil = pd.read_pickle('data/raw/Filtered_fil.pkl')
-
-
-#Subset_dokument = Dokument[Dokument['id'].isin(ids)]
-#Subset_fil = Fil[Fil['dokumentid'].isin(Subset_dokument['id'])]
 
 text_files = Filtered_fil['id'].tolist()
 
-print(f"Processing {len(text_files)} files")
+# Get the set of files that already exist in the output folder
+output_files = {int(os.path.basename(file).split('.')[0]) for file in glob.glob('data/all_paragraphs/paragraphs/*.txt')}
 
-#model = BertEmbed()
+# Find the files that need to be processed
+files_to_process = list(set(text_files) - output_files)
+
+print(f"Processing {len(files_to_process)} files")
+
 model = load_bert_base_model()
-
 
 newline_pattern = re.compile(r'\n')
 sentence_split_pattern = re.compile('[?.]')
-
 
 def rev_sigmoid(x: float) -> float:
     return (1 / (1 + math.exp(0.5 * x)))
@@ -138,7 +129,7 @@ def split_into_paragraphs(text, max_tokens=500, model=model):
 
 
 def process_file(file):
-    output_file = f'data/paragraphs/{file}.txt'
+    output_file = f'data/all_paragraphs/paragraphs/{file}.txt'
     
     # Check if the output file already exists
     if os.path.exists(output_file):
@@ -148,14 +139,15 @@ def process_file(file):
         with open(f'data/processed/{file}.txt', 'r', encoding='utf-8') as f:
             text = f.read()
         paragraphs = split_into_paragraphs(text, model=model)
-        with open(f'data/paragraphs/{file}.txt', 'w', encoding='utf-8') as f:
+        with open(f'data/all_paragraphs/paragraphs/{file}.txt', 'w', encoding='utf-8') as f:
             for paragraph in paragraphs:
                 f.write(paragraph + '\n')
     except Exception as e:
-        print(f"Error processing {file}: {e}")
+        pass
+        #print(f"Error processing {file}: {e}")
 
 if __name__ == '__main__':
-    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-        futures = [executor.submit(process_file, file) for file in text_files]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(process_file, file) for file in files_to_process]
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
             future.result()
