@@ -109,7 +109,7 @@ Spørgsmål 3: ..."""
             if retry_count == 2:  # If the second attempt fails, skip the chunk
                 print(f"Skipping chunk {i} of file {filename} after 2 failed attempts")
 
-def process_files(input_folder, output_folder, workers=16):
+def process_files(input_folder, output_folder, workers=20):
     os.makedirs(output_folder, exist_ok=True)
     files = os.listdir(input_folder)
 

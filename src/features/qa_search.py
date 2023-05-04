@@ -34,11 +34,30 @@ def find_similar_questions(query, embeddings, questions, k=5):
     
     return top_k_indices, list(zip(top_k_questions, top_k_scores))
 
-# Example usage
-new_question ="Hvad er et ofte fremført argument for administrativ centralisering (frem for decentralisering)?" 
-top_k = 5
+def find_question_answer_pairs(query, k=5):
+    top_k_indices, similar_questions = find_similar_questions(query, question_embeddings, questions, k=2*k)
+    question_answer_pairs = []
+    added_questions = set()
 
-top_k_indices, similar_questions = find_similar_questions(new_question, question_embeddings, questions, k=top_k)
-for i, (q, score) in enumerate(similar_questions):
-    answer = df.loc[top_k_indices[i], 'Svar']
-    print(f"{i + 1}. {q} (Similarity: {score:.4f})\nAnswer: {answer}\n")
+    for idx in top_k_indices:
+        question = df.loc[idx, 'Spørgsmål']
+        answer = df.loc[idx, 'Svar']
+        
+        if question not in added_questions:
+            question_answer_pairs.append((question, answer))
+            added_questions.add(question)
+
+        if len(question_answer_pairs) == k:
+            break
+
+    return question_answer_pairs
+
+
+if __name__ == "__main__":
+    new_question = "Hvad er skatteprocentsatsen i Danmark?" 
+    top_k = 25
+
+    top_k_indices, similar_questions = find_similar_questions(new_question, question_embeddings, questions, k=top_k)
+    for i, (q, score) in enumerate(similar_questions):
+        answer = df.loc[top_k_indices[i], 'Svar']
+        print(f"{i + 1}. {q} (Similarity: {score:.4f})\nAnswer: {answer}\n")

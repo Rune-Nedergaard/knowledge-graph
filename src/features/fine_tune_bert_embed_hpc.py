@@ -40,7 +40,6 @@ class QuestionChunkDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-    # Correct the indentation here
     def __getitem__(self, idx):
         question, paragraph = self.texts[idx]  # Use self.texts instead of self.question_chunk_pairs
 

@@ -7,14 +7,14 @@ import seaborn as sns
 import pandas as pd
 from sklearn.utils import resample
 
-def read_scores_from_folder(folder):
+def read_scores_from_folder(folder, score_prefix):
     files = glob.glob(os.path.join(folder, '*.txt'))
     scores = []
 
     for file in files:
         with open(file, 'r', encoding='iso-8859-1', errors='replace') as f:
             content = f.read()
-            scores.extend([float(x) for x in re.findall(r'Tekststykke \d: (\d\.\d+)', content)])
+            scores.extend([float(x) for x in re.findall(fr'{score_prefix} \d: (\d\.\d+)', content)])
 
     return scores
 
@@ -26,23 +26,33 @@ def bootstrap_confidence_interval(data, n_bootstrap=1000, ci=0.95):
 
 folder_1 = 'data/relevance_scores'
 folder_2 = 'data/relevance_scores_no_reranker'
+folder_3 = 'data/relevance_scores_qa_pairs'
+folder_4 = 'data/relevance_scores_danlp_qa_pairs'
 
-scores_1 = read_scores_from_folder(folder_1)
-scores_2 = read_scores_from_folder(folder_2)
+folders = [folder_1, folder_2, folder_3, folder_4]
+group_names = ['Reranker', 'No Reranker', 'Multilingual QA pairs', 'DaNLP QA pairs']
+score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par']
 
-ci_lower_1, ci_upper_1 = bootstrap_confidence_interval(scores_1)
-ci_lower_2, ci_upper_2 = bootstrap_confidence_interval(scores_2)
+data = []
 
-data = pd.DataFrame({
-    'Group': ['Reranker', 'No Reranker'],
-    'Mean': [np.mean(scores_1), np.mean(scores_2)],
-    'Lower CI': [ci_lower_1, ci_lower_2],
-    'Upper CI': [ci_upper_1, ci_upper_2]
-})
+for folder, group_name, score_prefix in zip(folders, group_names, score_prefixes):
+    scores = read_scores_from_folder(folder, score_prefix)
+    print(f"Number of scores read from {group_name}: {len(scores)}")  # Add this line to print the number of scores
+    if len(scores) > 0:  # Add this condition to avoid calculating the mean of an empty list
+        ci_lower, ci_upper = bootstrap_confidence_interval(scores)
+        data.append({
+            'Group': group_name,
+            'Mean': np.mean(scores),
+            'Lower CI': ci_lower,
+            'Upper CI': ci_upper
+        })
+
+
+data_df = pd.DataFrame(data)
 
 fig, ax = plt.subplots()
-sns.barplot(x='Group', y='Mean', data=data, ax=ax)
-ax.errorbar(data['Group'], data['Mean'], yerr=[data['Mean'] - data['Lower CI'], data['Upper CI'] - data['Mean']], fmt='none', c='black', capsize=5)
+sns.barplot(x='Group', y='Mean', data=data_df, ax=ax)
+ax.errorbar(data_df['Group'], data_df['Mean'], yerr=[data_df['Mean'] - data_df['Lower CI'], data_df['Upper CI'] - data_df['Mean']], fmt='none', c='black', capsize=5)
 
 plt.title('Comparison of Relevance Scores')
 plt.xlabel('Group')

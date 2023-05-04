@@ -51,7 +51,7 @@ Tekststykke 5: {list_of_paragraphs[4]}
             response = openai.ChatCompletion.create(
                 model=MODEL,
                 messages=[
-                    {"role": "system", "content": '''Du vurderer hvor relevante 5 forskellige stykker er i forhold til et givent input spørgsmål. Hver paragraf vurderes på en skala fra 0-1, hvor 0 er "slet ikke relevant" og 1 er "meget relevant". Det er sandsynligt at ingen er relevante, så vær hård i din vurdering og giv kun en høj score, hvis det faktisk er relevant. Svar uden yderligere forklaring med et decimaltal per paragraf, således:
+                    {"role": "system", "content": '''Du vurderer hvor relevante 5 forskellige tekststykker er i forhold til et givent input spørgsmål. Hver paragraf vurderes på en skala fra 0-1, hvor 0 er "slet ikke relevant" og 1 er "meget relevant". Det er sandsynligt at ingen er relevante, så vær hård i din vurdering og giv kun en høj score, hvis det faktisk er relevant. Svar uden yderligere forklaring med et decimaltal per paragraf, således:
                     
                     Tekststykke 1: 0.1
                     Tekststykke 2: 0.6
