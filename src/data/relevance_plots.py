@@ -33,10 +33,10 @@ folder_1 = 'data/relevance_scores'
 folder_2 = 'data/relevance_scores_no_reranker'
 folder_3 = 'data/relevance_scores_qa_pairs'
 folder_4 = 'data/relevance_scores_danlp_qa_pairs'
-
-folders = [folder_1, folder_2, folder_3, folder_4]
-group_names = ['With Reranker\nParagraphs', 'Without Reranker\nParagraphs', 'Multilingual\n500K QA pairs', 'DaNLP\n500K QA pairs']
-score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par']
+folder_5 = 'data/relevance_scores_200k_qa_pairs'
+folders = [folder_1, folder_2, folder_3, folder_4, folder_5]
+group_names = ['With Reranker\nParagraphs', 'Without Reranker\nParagraphs', 'Multilingual\n500K QA pairs', 'DaNLP\n500K QA pairs', 'Multilingual\n1200K QA pairs']
+score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par', 'Par']
 
 data = []
 
@@ -55,9 +55,9 @@ for folder, group_name, score_prefix in zip(folders, group_names, score_prefixes
 
 data_df = pd.DataFrame(data)
 
-plt.figure(figsize=(15, 9))
+#plt.figure(figsize=(20, 10))
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(10, 6))
 sns.barplot(x='Group', y='Mean', data=data_df, ax=ax)
 ax.errorbar(data_df['Group'], data_df['Mean'], yerr=[data_df['Mean'] - data_df['Lower CI'], data_df['Upper CI'] - data_df['Mean']], fmt='none', c='black', capsize=5)
 

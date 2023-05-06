@@ -18,8 +18,8 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 #from src.features.qa_search_danlp import find_question_answer_pairs
-from src.features.qa_search import find_question_answer_pairs
-from src.features.qa_search import find_question_answer_pairs, initialize_qa_search
+from src.features.old_qa_search import find_question_answer_pairs
+#from src.features.qa_search import find_question_answer_pairs, initialize_qa_search
 
 openai.api_key = API_KEY
 failed_files = []
@@ -28,20 +28,24 @@ output_folder = 'data/reranker_triplets'
 
 def process_question(question, qa_pairs):
     retry = 0
-    template = '''Input spørgsmål: {question}
+    try:
+        template = '''Input spørgsmål: {question}
 
-    Par 1: {qa_pairs[0]}
+        Par 1: {pair1}
 
-    Par 2: {qa_pairs[1]}
+        Par 2: {pair2}
 
-    Par 3: {qa_pairs[2]}
+        Par 3: {pair3}
 
-    Par 4: {qa_pairs[3]}
+        Par 4: {pair4}
 
-    Par 5: {qa_pairs[4]}
-    '''
+        Par 5: {pair5}
+        '''
 
-    REQUEST = template.format(question=question, qa_pairs=qa_pairs)
+        REQUEST = template.format(question=question, pair1=qa_pairs[0], pair2=qa_pairs[1], pair3=qa_pairs[2], pair4=qa_pairs[3], pair5=qa_pairs[4])
+    except:
+        print('Error in formatting question: ', question)
+        pass
     #count the number of tokens in the request
   
     while retry < 1:
@@ -86,9 +90,8 @@ if __name__ == '__main__':
         with open(file, 'r', encoding='iso-8859-1', errors='replace') as f:
             questions.append(f.read())
 
-    df, sentence_model, question_embeddings, questions, device = initialize_qa_search()
 
-    results = [find_question_answer_pairs(question, df, sentence_model, question_embeddings, questions, k=5, device=None) for question in tqdm(questions, desc="Finding QA-pairs for questions")]
+    results = [find_question_answer_pairs(question) for question in tqdm(questions, desc="Finding QA-pairs for questions")]
 
     relevance_output_folder = "data/relevance_scores_200k_qa_pairs"
     paragraph_output_folder = "data/found_paragraphs_200k_qa_pairs"
