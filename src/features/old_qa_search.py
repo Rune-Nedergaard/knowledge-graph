@@ -35,7 +35,7 @@ def find_similar_questions(query, embeddings, questions, k=5):
     return top_k_indices, list(zip(top_k_questions, top_k_scores))
 
 def find_question_answer_pairs(query, k=5):
-    top_k_indices, similar_questions = find_similar_questions(query, question_embeddings, questions, k=2*k)
+    top_k_indices, similar_questions = find_similar_questions(query, question_embeddings, questions, k=4*k)
     question_answer_pairs = []
     added_questions = set()
 

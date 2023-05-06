@@ -56,21 +56,26 @@ Indeks på relevante par: [3,7,8,..etc.]"""},
     answer = response['choices'][0]['message']['content']
     return answer
 
-def get_relevant_indices_from_response(gpt4_response, relevant_qa_pairs, df):
-    relevant_pair_indices = re.findall(r"Indeks på relevante par: \[([0-9,\s]+)\]", gpt4_response)
+def get_relevant_indices_from_response(gpt4_response, relevant_qa_list, df):
+    relevant_pair_indices = re.findall(r"Indeks på relevante par: ?\[?([0-9,\s]+)\]?", gpt4_response)
+    
+    if not relevant_pair_indices:
+        relevant_pair_indices = re.findall(r"Indeks på relevante par: ([0-9,\s]+)", gpt4_response)
+    
     if relevant_pair_indices:
-        relevant_pair_indices = [int(idx) - 1 for idx in relevant_pair_indices[0].split(",")]
+        relevant_pair_indices = [int(idx) - 1 for idx in re.split(r',\s*', relevant_pair_indices[0])]
     else:
-        print("Ingen relevante par fundet. Viser de 5 første par som eksempel.")
+        print("Ingen relevante par fundet i GPT-4 svar. Vælger de 5 første par.")
         relevant_pair_indices = list(range(5))
 
     relevant_df_indices = []
     for idx in relevant_pair_indices:
-        question, answer, date = relevant_qa_pairs[idx][:3]
+        question, answer, date = relevant_qa_list[idx][:3]
         original_index = df[(df['Spørgsmål'] == question) & (df['Svar'] == answer)].index[0]
         relevant_df_indices.append(original_index)
 
     return relevant_df_indices, relevant_pair_indices
+
 
 def read_mcq_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -97,7 +102,7 @@ def process_mcq(count, mcq, df, sentence_model, question_embeddings, questions):
     relevant_df_indices, relevant_pair_indices = get_relevant_indices_from_response(gpt4_response, relevant_qa_list, df)
 
     # Save GPT-4 input and output to a txt file
-    with open(f'data/mc_results/{count+1}.txt', 'w', encoding='utf-8') as f:
+    with open(f'data/mc_results/{count}.txt', 'w', encoding='utf-8') as f:
         # Write the MCQ
         f.write("Multiple choice spørgsmål:\n")
         f.write(mcq)
@@ -131,13 +136,13 @@ if __name__ == "__main__":
     existing_output_files = get_existing_output_files(output_folder)
 
     # Filter the mcq_list to exclude existing output files
-    filtered_mcq_list = [(idx, mcq) for idx, mcq in enumerate(mcq_list) if idx + 1 not in existing_output_files]
+    filtered_mcq_list = [(idx + 1, mcq) for idx, mcq in enumerate(mcq_list) if idx + 1 not in existing_output_files]
 
 
     df, sentence_model, question_embeddings, questions, device = initialize_qa_search()
 
         # Create a ThreadPoolExecutor with a specific number of worker threads (e.g., 4)
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         # Submit the tasks to the ThreadPoolExecutor
         futures = [executor.submit(process_mcq, count, mcq, df, sentence_model, question_embeddings, questions) for count, mcq in filtered_mcq_list]
 
