@@ -17,8 +17,9 @@ import pickle
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-from src.features.qa_search_danlp import find_question_answer_pairs
-#from src.features.qa_search import find_question_answer_pairs
+#from src.features.qa_search_danlp import find_question_answer_pairs
+from src.features.qa_search import find_question_answer_pairs
+from src.features.qa_search import find_question_answer_pairs, initialize_qa_search
 
 openai.api_key = API_KEY
 failed_files = []
@@ -84,11 +85,13 @@ if __name__ == '__main__':
     for file in files:
         with open(file, 'r', encoding='iso-8859-1', errors='replace') as f:
             questions.append(f.read())
-    
-    results = [find_question_answer_pairs(question, k=5) for question in tqdm(questions, desc="Finding QA-pairs for questions")]
 
-    relevance_output_folder = "data/relevance_scores_danlp_qa_pairs"
-    paragraph_output_folder = "data/found_paragraphs_danlp_qa_pairs"
+    df, sentence_model, question_embeddings, questions, device = initialize_qa_search()
+
+    results = [find_question_answer_pairs(question, df, sentence_model, question_embeddings, questions, k=5, device=None) for question in tqdm(questions, desc="Finding QA-pairs for questions")]
+
+    relevance_output_folder = "data/relevance_scores_200k_qa_pairs"
+    paragraph_output_folder = "data/found_paragraphs_200k_qa_pairs"
     os.makedirs(relevance_output_folder, exist_ok=True)
     os.makedirs(paragraph_output_folder, exist_ok=True)
 

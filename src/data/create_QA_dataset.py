@@ -2,6 +2,7 @@ import os
 import re
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
 # Load the required DataFrames
 Fil = pd.read_pickle('data/raw/Fil.pkl')
@@ -14,7 +15,7 @@ Aktør = pd.read_pickle('data/raw/Aktør.pkl')
 def extract_qa_pairs(text):
     qa_pairs = []
     """
-    To handle some minor inconsistencies in the data, we have to consider two cases:
+    To handle some minor inconsistencies in the data, we have to consider three cases:
     """
     # Case 1: Questions are explicitly marked with "Spørgsmål" and "Svar" - this accounts for 99% of the data
     questions = re.findall(r'Spørgsmål \d+: (.+)', text)
@@ -45,9 +46,26 @@ def process_files(input_folder):
     data = []
     files = os.listdir(input_folder)
 
+    # Initialize max_chunk dictionary
+    max_chunks = {}
+
+    # Find the maximum chunk value for each filename
+    for file in tqdm(files, desc='Finding max chunk values'):
+        if file.endswith('.txt'):
+            basename, chunk = os.path.splitext(file)[0].rsplit('_', 1)
+            chunk = int(chunk)
+            if basename in max_chunks:
+                max_chunks[basename] = max(max_chunks[basename], chunk)
+            else:
+                max_chunks[basename] = chunk
+
+    # Process files and update the "chunk" value with "chunk/max_chunk"
     for file in tqdm(files, desc='Processing files'):
         if file.endswith('.txt'):
             basename, chunk = os.path.splitext(file)[0].rsplit('_', 1)
+            chunk = int(chunk)
+            max_chunk = max_chunks[basename]
+            chunk_ratio = f"{chunk}/{max_chunk}"
 
             # Retrieve additional information
             dokumentid = Fil.loc[Fil['id'] == int(basename), 'dokumentid'].values
@@ -63,6 +81,8 @@ def process_files(input_folder):
 
                 filurl = Fil.loc[Fil['id'] == int(basename), 'filurl'].values[0]
                 date = Fil.loc[Fil['id'] == int(basename), 'versionsdato'].values[0]
+                if date is not None:
+                    date = np.datetime_as_string(date, unit='D')
 
                 aktørids = DokumentAktør.loc[DokumentAktør['dokumentid'] == dokumentid, 'aktørid'].values
                 entities = [Aktør.loc[Aktør['id'] == aktørid, 'navn'].values[0] for aktørid in aktørids]
@@ -88,7 +108,7 @@ def process_files(input_folder):
                         'Spørgsmål': q,
                         'Svar': a,
                         'Filename': basename,
-                        'Chunk': chunk,
+                        'Chunk': chunk_ratio,
                         'titel': titel,
                         'emneord': theme,
                         'type': type_,
@@ -102,13 +122,15 @@ def process_files(input_folder):
 
 
 
+
 def create_QA_dataset(input_folder):
     data = process_files(input_folder)
-    df = pd.DataFrame(data, columns=['Spørgsmål', 'Svar', 'Filename', 'Chunk', 'titel', 'emneord', 'type'])
+    df = pd.DataFrame(data, columns=['Spørgsmål', 'Svar', 'Filename', 'Chunk', 'titel', 'emneord', 'type', 'date', 'filurl'])
     return df
 
+
 if __name__ == '__main__':
-    input_folder = 'data/test_qa'
+    input_folder = 'data/output_responses'
     df = create_QA_dataset(input_folder)
     #save to pickle
     df.to_pickle('data/QA_dataset.pkl')

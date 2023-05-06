@@ -34,13 +34,14 @@ def create_gpt4_prompt(question, relevant_qa_list):
         prompt += f"{i + 1}:Spørgsmål: {qa_question}\nSvar: {qa_answer}\n\n"
 
     return prompt
+# Less constrained: {"role": "system", "content": """Du besvarer multiple choice spørgsmål baseret på information i vedlagte spørgsmål-svar par. Besvar multiple choice spørgsmålet og giv dernæst en forklaring på, hvorfor du har valgt det svar. Referer til mindst 5 relevante spørgsmål-svar par i din forklaring. Såfremt de vedlagte spørgsmål-svar ikke helt indeholder nok information til at besvares spørgsmålet, må du forklare at du gætter  og benytte hvad end de indeholder af små ledetråde til at vælge dit bedste gæt. Angiv dit svar således:
 
 def get_gpt4_response(gpt4_prompt):
     print("Genererer svar baseret på relevante spørgsmål-svar par identificeret vha. søgning på underspørgsmål...")
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": """Du besvarer multiple choice spørgsmål ud fra information i vedlagte spørgsmål-svar par. Du må kun tage udgangspunkt i informationen i disse spørgsmål-svar par og ikke benytte anden viden. Besvar multiple choice spørgsmålet og giv dernæst en forklaring på, hvorfor du har valgt det svar. Referer til mindst 5 relevante spørgsmål-svar par i din forklaring. Såfremt de vedlagte spørgsmål-svar ikke indeholder nok information til at besvares spørgsmålet, må du forklare at du gætter og eventuelt benytte hvad end de indeholder af små ledetråde til at vælge dit bedste gæt. Du skal svare, så hvis du intet ved må du gætte a/b/c/d helt tilfældigt og sige dette. Angiv dit svar således:
+            {"role": "system", "content": """Du besvarer multiple choice spørgsmål ud fra information i vedlagte spørgsmål-svar par. Du må kun tage udgangspunkt i informationen i disse spørgsmål-svar par og ikke benytte anden viden. Besvar multiple choice spørgsmålet og giv dernæst en forklaring på, hvorfor du har valgt det svar. Referer til mindst 5 relevante spørgsmål-svar par i din forklaring. Såfremt de vedlagte spørgsmål-svar ikke indeholder nok information til at besvares spørgsmålet, må du forklare at du gætter og eventuelt benytte hvad end de indeholder af små ledetråde til at vælge dit bedste gæt. Angiv dit svar således:
 
 Svar: [a/b/c/d]
 
@@ -56,21 +57,27 @@ Indeks på relevante par: [3,7,8,..etc.]"""},
     answer = response['choices'][0]['message']['content']
     return answer
 
-def get_relevant_indices_from_response(gpt4_response, relevant_qa_pairs, df):
-    relevant_pair_indices = re.findall(r"Indeks på relevante par: \[([0-9,\s]+)\]", gpt4_response)
+def get_relevant_indices_from_response(gpt4_response, relevant_qa_list, df):
+    relevant_pair_indices = re.findall(r"Indeks på relevante par: ?\[?([0-9,\s]+)\]?", gpt4_response)
+    
+    if not relevant_pair_indices:
+        relevant_pair_indices = re.findall(r"Indeks på relevante par: ([0-9,\s]+)", gpt4_response)
+    
     if relevant_pair_indices:
-        relevant_pair_indices = [int(idx) - 1 for idx in relevant_pair_indices[0].split(",")]
+        relevant_pair_indices = [int(idx) - 1 for idx in re.split(r',\s*', relevant_pair_indices[0])]
     else:
-        print("Ingen relevante par fundet. Viser de 5 første par som eksempel.")
+        print("Ingen relevante par fundet i GPT-4 svar. Vælger de 5 første par.")
         relevant_pair_indices = list(range(5))
 
     relevant_df_indices = []
     for idx in relevant_pair_indices:
-        question, answer, date = relevant_qa_pairs[idx][:3]
+        question, answer, date = relevant_qa_list[idx][:3]
         original_index = df[(df['Spørgsmål'] == question) & (df['Svar'] == answer)].index[0]
         relevant_df_indices.append(original_index)
 
     return relevant_df_indices, relevant_pair_indices
+
+
 
 def read_mcq_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -91,8 +98,7 @@ def process_mcq(count, mcq, df, sentence_model, question_embeddings, questions):
     relevant_qa_list = [(df.loc[idx, 'Spørgsmål'], df.loc[idx, 'Svar'], df.loc[idx, 'date']) for idx in relevant_indices]#removed titel
     gpt4_prompt = create_gpt4_prompt(mcq, relevant_qa_list)
     gpt4_response = get_gpt4_response(gpt4_prompt)
-    print(f"Modellens svar:\n{gpt4_response}\n")
-
+    print(f"GPT-4 Response:\n{gpt4_response}\n")
     # Find the relevant QA pair indices in the GPT-4 response
     relevant_df_indices, relevant_pair_indices = get_relevant_indices_from_response(gpt4_response, relevant_qa_list, df)
 

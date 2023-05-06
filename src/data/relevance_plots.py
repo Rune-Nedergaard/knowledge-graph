@@ -7,6 +7,11 @@ import seaborn as sns
 import pandas as pd
 from sklearn.utils import resample
 
+# Set seaborn style and palette
+sns.set(style="whitegrid")
+sns.set_palette("muted")
+
+
 def read_scores_from_folder(folder, score_prefix):
     files = glob.glob(os.path.join(folder, '*.txt'))
     scores = []
@@ -30,7 +35,7 @@ folder_3 = 'data/relevance_scores_qa_pairs'
 folder_4 = 'data/relevance_scores_danlp_qa_pairs'
 
 folders = [folder_1, folder_2, folder_3, folder_4]
-group_names = ['Reranker', 'No Reranker', 'Multilingual QA pairs', 'DaNLP QA pairs']
+group_names = ['With Reranker\nParagraphs', 'Without Reranker\nParagraphs', 'Multilingual\n500K QA pairs', 'DaNLP\n500K QA pairs']
 score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par']
 
 data = []
@@ -50,6 +55,8 @@ for folder, group_name, score_prefix in zip(folders, group_names, score_prefixes
 
 data_df = pd.DataFrame(data)
 
+plt.figure(figsize=(15, 9))
+
 fig, ax = plt.subplots()
 sns.barplot(x='Group', y='Mean', data=data_df, ax=ax)
 ax.errorbar(data_df['Group'], data_df['Mean'], yerr=[data_df['Mean'] - data_df['Lower CI'], data_df['Upper CI'] - data_df['Mean']], fmt='none', c='black', capsize=5)
@@ -57,4 +64,9 @@ ax.errorbar(data_df['Group'], data_df['Mean'], yerr=[data_df['Mean'] - data_df['
 plt.title('Comparison of Relevance Scores')
 plt.xlabel('Group')
 plt.ylabel('Relevance Score')
+
+# Rotate the x-axis labels
+#plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+
 plt.show()
