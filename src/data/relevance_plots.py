@@ -19,7 +19,7 @@ def read_scores_from_folder(folder, score_prefix):
     for file in files:
         with open(file, 'r', encoding='iso-8859-1', errors='replace') as f:
             content = f.read()
-            scores.extend([float(x) for x in re.findall(fr'{score_prefix} \d: (\d\.\d+)', content)])
+            scores.extend([float(x) for x in re.findall(fr'{score_prefix} \d: (\d(?:\.\d+)?)', content)])
 
     return scores
 
@@ -34,9 +34,10 @@ folder_2 = 'data/relevance_scores_no_reranker'
 folder_3 = 'data/relevance_scores_qa_pairs'
 folder_4 = 'data/relevance_scores_danlp_qa_pairs'
 folder_5 = 'data/relevance_scores_200k_qa_pairs'
-folders = [folder_1, folder_2, folder_3, folder_4, folder_5]
-group_names = ['With Reranker\nParagraphs', 'Without Reranker\nParagraphs', 'Multilingual\n500K QA pairs', 'DaNLP\n500K QA pairs', 'Multilingual\n1200K QA pairs']
-score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par', 'Par']
+folder_6 = 'data/relevance_random'
+folders = [folder_1, folder_2, folder_3, folder_4, folder_5, folder_6]
+group_names = ['With Reranker\nParagraphs', 'Without Reranker\nParagraphs', 'Multilingual\n500K QA pairs', 'DaNLP\n500K QA pairs', 'Multilingual\n1200K QA pairs', 'Baseline']
+score_prefixes = ['Tekststykke', 'Tekststykke', 'Par', 'Par', 'Par', 'Par']
 
 data = []
 

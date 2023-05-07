@@ -6,8 +6,8 @@ sns.set_style("whitegrid")
 
 # Define the categories and weighted sums
 categories = ['Agree-Correct', 'Agree-Incorrect', 'Disagree-Correct', 'Disagree-Incorrect']
-explanation_weighted_sums = [64, 12, 58, 16]
-no_explanation_weighted_sums = [64, 9, 60, 17]
+explanation_weighted_sums = [86, 13, 36, 15]
+no_explanation_weighted_sums = [86, 15, 38, 11]
 
 # Create a grouped bar plot
 bar_width = 0.35

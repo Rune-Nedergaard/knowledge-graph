@@ -4,7 +4,7 @@ import glob
 def numerical_sort_key(file_path):
     return int(os.path.splitext(os.path.basename(file_path))[0])
 
-folder_path = 'data/2019results05constrained'
+folder_path = 'data/videnstest'
 output_file = os.path.join(folder_path, 'combined.txt')
 
 # Get all the txt files in the folder

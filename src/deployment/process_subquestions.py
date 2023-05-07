@@ -31,8 +31,12 @@ def relevant_qa_pairs(MCQ_question, subquestion, df, sentence_model, question_em
 
     #check if formatted_qa_pairs is above 3700 tokens
     if count_gpt35_tokens(formatted_qa_pairs) > 3700:
-        results = results[:25]
+        results = results[:20]
         formatted_qa_pairs = process_question(MCQ_question, results)
+        while count_gpt35_tokens(formatted_qa_pairs) > 3700:
+            print("Too many tokens, reducing number of results in subquestion again..")
+            results = results[:-1]
+            formatted_qa_pairs = process_question(MCQ_question, results)
     
 
     #print("Reranking to find the 10 most relevant QA pairs")

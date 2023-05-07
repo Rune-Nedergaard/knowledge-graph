@@ -9,11 +9,18 @@ import concurrent
 
 openai.api_key = API_KEY
 
+import tiktoken
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from src.features.qa_search import find_question_answer_pairs, initialize_qa_search
 from src.deployment.divide_mcq import divide_mcq
 from src.deployment.process_subquestions import relevant_qa_pairs
+
+tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
+def count_gpt35_tokens(text):
+    tokens = tokenizer.encode_ordinary(text)
+    return len(tokens)
 
 def find_relevant_qa_pairs(mcq, df, sentence_model, question_embeddings, questions, k=10):
     subquestions = divide_mcq(mcq)
@@ -33,6 +40,14 @@ def create_gpt4_prompt(question, relevant_qa_list):
     for i, (qa_question, qa_answer, date) in enumerate(relevant_qa_list):#removed date, seemed less usefull
         prompt += f"{i + 1}:Spørgsmål: {qa_question}\nSvar: {qa_answer}\n\n"
 
+    #check if prompt is above 6000 tokens using count function
+    if count_gpt35_tokens(prompt) > 5500:
+        #remove the last qa pair
+        prompt = prompt.rsplit('\n\n', 2)[0]
+        print("Prompt too long, removing last qa pair")
+        while count_gpt35_tokens(prompt) > 5500:
+            prompt = prompt.rsplit('\n\n', 1)[0]
+            print("Prompt too long, removing last qa pair again...")
     return prompt
 
 def get_gpt4_response(gpt4_prompt):
@@ -63,7 +78,11 @@ def get_relevant_indices_from_response(gpt4_response, relevant_qa_list, df):
         relevant_pair_indices = re.findall(r"Indeks på relevante par: ([0-9,\s]+)", gpt4_response)
     
     if relevant_pair_indices:
-        relevant_pair_indices = [int(idx) - 1 for idx in re.split(r',\s*', relevant_pair_indices[0])]
+        try:
+            relevant_pair_indices = [int(idx) - 1 for idx in re.split(r',\s*', relevant_pair_indices[0])]
+        except:
+            print("Kunne ikke finde relevante par i GPT-4 svar. Vælger de 5 første par.")
+            relevant_pair_indices = list(range(5))
     else:
         print("Ingen relevante par fundet i GPT-4 svar. Vælger de 5 første par.")
         relevant_pair_indices = list(range(5))
@@ -128,7 +147,7 @@ def process_mcq(count, mcq, df, sentence_model, question_embeddings, questions):
 
 
 if __name__ == "__main__":
-    file_path = 'data/exam2019.txt'
+    file_path = 'data/videnstest.txt'
     mcq_list = read_mcq_file(file_path)
 
     # Get the existing output files

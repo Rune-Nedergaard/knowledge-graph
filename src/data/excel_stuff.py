@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from scipy.stats import sem
+from scipy.stats import t
+
 
 data = pd.read_csv('data/explanation.csv')
 
@@ -164,14 +166,19 @@ x_pos = np.arange(len(categories))
 cap_size = 5  # Set the size of the error bar caps
 
 fig, ax = plt.subplots(figsize=(10, 6))  # Set the plot size
-rects1 = ax.bar(x_pos - bar_width/2, [len(i) for i in explanation_data], bar_width, label='With Explanation', yerr=[max(1.96*np.std(i)/np.sqrt(len(i)), 0) for i in explanation_data], error_kw={'capsize': cap_size})
-rects2 = ax.bar(x_pos + bar_width/2, [len(i) for i in no_explanation_data], bar_width, label='No Explanation', yerr=[max(1.96*np.std(i)/np.sqrt(len(i)), 0) for i in no_explanation_data], error_kw={'capsize': cap_size})
+# Calculate the T-score for a 95% confidence interval and the given sample size (n - 1)
+t_score = t.ppf(0.975, df=len(explanation_data[0]) - 1)
+
+rects1 = ax.bar(x_pos - bar_width/2, [len(i) for i in explanation_data], bar_width, label='With Explanation',
+                yerr=[max(t_score * np.std(i) / np.sqrt(len(i)), 0) for i in explanation_data], error_kw={'capsize': cap_size})
+rects2 = ax.bar(x_pos + bar_width/2, [len(i) for i in no_explanation_data], bar_width, label='No Explanation',
+                yerr=[max(t_score * np.std(i) / np.sqrt(len(i)), 0) for i in no_explanation_data], error_kw={'capsize': cap_size})
 
 ax.set_ylabel('Unweighted Count')
-ax.set_title('Effect of Explanations comparing Respondent-Model Agreement/Disagreement by Model Correctness')
+ax.set_title('Effect of Explanations: Comparing Respondent-Model Agreement/Disagreement Filtered by Model Correctness')
 ax.set_xticks(x_pos)
 ax.set_xticklabels(categories)
-ax.set_ylim([0, 35])
+ax.set_ylim([0, 45])
 ax.legend()
 
 plt.tight_layout()
